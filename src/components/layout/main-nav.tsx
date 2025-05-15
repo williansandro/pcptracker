@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -10,8 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-
+// Tooltip not explicitly used here anymore if handled by SidebarMenuButton prop
 
 export interface NavItem {
   href: string;
@@ -33,7 +33,12 @@ export function MainNav() {
               isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
               disabled={item.disabled}
               aria-disabled={item.disabled}
-              className="w-full justify-start"
+              className={cn(
+                "w-full justify-start",
+                // Custom active styles to match Berry (light purple background, purple text)
+                // These are now primarily driven by --sidebar-accent and --sidebar-accent-foreground
+                // defined in globals.css and applied by the SidebarMenuButton's data-[active=true] state
+              )}
               tooltip={{ children: item.label, side: 'right', align: 'center' }}
             >
               <a>

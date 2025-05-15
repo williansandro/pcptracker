@@ -5,55 +5,57 @@
 
 @layer base {
   :root {
-    --background: 240 10% 97%; /* Lighter gray for a softer background */
-    --foreground: 235 10% 20%; /* Darker text for better contrast */
+    --background: 220 20% 97%; /* Very light cool gray */
+    --foreground: 240 10% 15%; /* Dark text */
 
-    --muted: 240 5% 90%;
+    --muted: 240 5% 94%;
     --muted-foreground: 240 5% 45%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 235 10% 20%;
+    --popover-foreground: 240 10% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 235 10% 20%;
+    --card-foreground: 240 10% 15%;
 
-    --border: 240 5% 85%;
-    --input: 240 5% 85%;
+    --border: 240 5% 90%;
+    --input: 0 0% 100%;
+    /* --input-border: 240 5% 85%; Consider adding if default --border isn't enough for inputs */
 
-    --primary: 235 62% 30%; /* Deep Blue #1A237E */
-    --primary-foreground: 0 0% 98%; /* White text on Deep Blue */
+    --primary: 260 70% 60%; /* Berry Purple */
+    --primary-foreground: 0 0% 100%; /* White text on purple */
 
-    --secondary: 230 40% 90%; /* Lighter, desaturated blue/gray for secondary elements */
-    --secondary-foreground: 235 62% 30%; /* Deep Blue text on light blue/gray */
+    --secondary: 240 5% 90%; /* Subtle secondary elements */
+    --secondary-foreground: 240 5% 30%;
 
-    --accent: 188 100% 38%; /* Teal #00ACC1 */
-    --accent-foreground: 0 0% 100%; /* White text on Teal */
+    --accent: 210 85% 55%; /* Berry Blue */
+    --accent-foreground: 0 0% 100%; /* White text on blue */
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 188 100% 38%; /* Teal for focus rings */
+    --ring: 210 85% 55%; /* Berry Blue for focus rings */
     --radius: 0.5rem;
 
-    --chart-1: 235 62% 50%; /* Primary related */
-    --chart-2: 188 100% 45%; /* Accent related */
-    --chart-3: 210 50% 60%;
-    --chart-4: 30 80% 65%;
-    --chart-5: 120 40% 55%;
+    --chart-1: 260 70% 60%; /* Purple */
+    --chart-2: 210 85% 55%; /* Blue */
+    --chart-3: 260 70% 75%; /* Lighter Purple */
+    --chart-4: 210 85% 70%; /* Lighter Blue */
+    --chart-5: 30 80% 65%;   /* Orange/Yellow accent */
 
-    /* Sidebar specific theme variables from existing config, can be adjusted if needed */
-    --sidebar-background: 0 0% 98%; /* Default from existing */
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 235 62% 30%; /* Match app primary */
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 188 100% 38%; /* Match app accent */
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 5% 85%; /* Match app border */
-    --sidebar-ring: 188 100% 38%; /* Match app ring */
+    /* Sidebar specific theme variables */
+    --sidebar-background: 0 0% 100%; /* White sidebar */
+    --sidebar-foreground: 240 10% 15%;
+    --sidebar-primary: 260 70% 60%; /* Purple for text/icons in sidebar if needed directly */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 260 70% 95%; /* Very light purple for active item background */
+    --sidebar-accent-foreground: 260 70% 50%; /* Purple text on light purple active item */
+    --sidebar-border: 240 5% 90%;
+    --sidebar-ring: 210 85% 55%;
   }
 
   .dark {
-    --background: 235 20% 12%; /* Dark blue-gray */
+    /* Keeping dark mode similar to original, but can be adjusted to match Berry's dark if one exists */
+    --background: 235 20% 12%;
     --foreground: 0 0% 95%;
 
     --muted: 235 20% 20%;
@@ -68,34 +70,34 @@
     --border: 235 20% 25%;
     --input: 235 20% 25%;
 
-    --primary: 235 62% 55%; /* Lighter Deep Blue for dark mode */
+    --primary: 260 70% 65%; /* Lighter Purple for dark mode */
     --primary-foreground: 0 0% 98%;
 
     --secondary: 235 20% 30%;
     --secondary-foreground: 0 0% 95%;
 
-    --accent: 188 100% 48%; /* Brighter Teal for dark mode */
+    --accent: 210 85% 60%; /* Brighter Blue for dark mode */
     --accent-foreground: 235 20% 10%;
 
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 188 100% 48%;
+    --ring: 210 85% 60%;
 
-    --chart-1: 235 62% 60%;
-    --chart-2: 188 100% 55%;
-    --chart-3: 210 50% 70%;
-    --chart-4: 30 80% 75%;
-    --chart-5: 120 40% 65%;
+    --chart-1: 260 70% 70%;
+    --chart-2: 210 85% 65%;
+    --chart-3: 260 70% 80%;
+    --chart-4: 210 85% 75%;
+    --chart-5: 30 80% 70%;
 
-    --sidebar-background: 235 20% 10%; /* Darker for sidebar */
+    --sidebar-background: 235 15% 15%; /* Darker for sidebar in dark mode */
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 235 62% 55%;
+    --sidebar-primary: 260 70% 65%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 188 100% 48%;
-    --sidebar-accent-foreground: 235 20% 10%;
+    --sidebar-accent: 260 70% 25%; /* Darker, muted purple for active item background */
+    --sidebar-accent-foreground: 260 70% 75%; /* Lighter purple text for active item */
     --sidebar-border: 235 20% 25%;
-    --sidebar-ring: 188 100% 48%;
+    --sidebar-ring: 210 85% 60%;
   }
 }
 
@@ -111,15 +113,16 @@
 /* Custom Progress Bar Colors */
 @layer components {
   .progress-bar-red > div {
-    @apply bg-red-500;
+    @apply bg-red-500; /* Tailwind red */
   }
   .progress-bar-yellow > div {
-    @apply bg-yellow-500;
+    @apply bg-yellow-500; /* Tailwind yellow */
   }
   .progress-bar-green > div {
-    @apply bg-green-500;
+    @apply bg-green-500; /* Tailwind green */
   }
   .progress-bar-blue > div {
-    @apply bg-blue-500;
+    @apply bg-blue-500; /* Tailwind blue, can be changed to theme accent if preferred */
+    /* For Berry blue accent: @apply bg-accent; */
   }
 }
