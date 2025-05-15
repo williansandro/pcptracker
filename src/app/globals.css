@@ -128,28 +128,33 @@
 
   /* Colored Metric Cards */
   .metric-card-purple {
-    @apply bg-primary text-primary-foreground;
+    @apply bg-gradient-to-br from-purple-500 to-indigo-600 text-primary-foreground;
+    /* Using Tailwind direct colors for gradient as HSL var might be complex for gradient definition here */
+    /* Fallback: @apply bg-primary text-primary-foreground; */
   }
   .metric-card-purple .text-muted-foreground {
     @apply text-primary-foreground/80;
   }
 
   .metric-card-blue {
-    @apply bg-accent text-accent-foreground;
+     @apply bg-gradient-to-br from-sky-500 to-blue-600 text-accent-foreground;
+    /* Fallback: @apply bg-accent text-accent-foreground; */
   }
   .metric-card-blue .text-muted-foreground {
     @apply text-accent-foreground/80;
   }
 
   .metric-card-orange {
-    @apply bg-orange-500 text-white;
+    @apply bg-gradient-to-br from-orange-400 to-red-500 text-white;
+    /* Fallback: @apply bg-orange-500 text-white; */
   }
   .metric-card-orange .text-muted-foreground {
     @apply text-white/80;
   }
 
   .metric-card-teal {
-    @apply bg-teal-600 text-white;
+    @apply bg-gradient-to-br from-teal-400 to-cyan-600 text-white;
+    /* Fallback: @apply bg-teal-600 text-white; */
   }
   .metric-card-teal .text-muted-foreground {
     @apply text-white/80;
