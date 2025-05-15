@@ -1,18 +1,22 @@
+
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Demand, ProductionOrder } from "@/types";
+import type { Demand, ProductionOrder, SKU } from "@/types";
 import { DemandActions } from "./demand-actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useAppContext } from "@/contexts/app-context";
+// Removed: import { useAppContext } from "@/contexts/app-context";
 import { format, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export const getDemandColumns = (): ColumnDef<Demand>[] => {
-  const { findSkuById, getProductionOrdersBySku } = useAppContext();
+export const getDemandColumns = (
+  findSkuById: (skuId: string) => SKU | undefined,
+  getProductionOrdersBySku: (skuId: string) => ProductionOrder[]
+): ColumnDef<Demand>[] => {
+  // Removed: const { findSkuById, getProductionOrdersBySku } = useAppContext();
 
   return [
     {

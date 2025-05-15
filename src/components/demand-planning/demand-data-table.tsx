@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -25,8 +26,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { DataTablePagination } from "@/components/data-table-pagination";
 import { DemandFormDialog } from "./demand-form-dialog";
-import { getDemandColumns } from "./demand-columns"; // Import the function
-import { useAppContext } from "@/contexts/app-context"; // To trigger re-render when context changes
+import { getDemandColumns } from "./demand-columns"; 
+import { useAppContext } from "@/contexts/app-context"; 
 
 interface DemandDataTableProps<TData, TValue> {
   data: TData[];
@@ -40,9 +41,12 @@ export function DemandDataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   
-  // Use the hook to ensure columns are re-generated if context (e.g. SKUs) changes
-  const appContext = useAppContext(); 
-  const columns = React.useMemo(() => getDemandColumns() as ColumnDef<TData, TValue>[], [appContext.skus, appContext.productionOrders]);
+  const { findSkuById, getProductionOrdersBySku, skus, productionOrders } = useAppContext(); 
+  
+  const columns = React.useMemo(
+    () => getDemandColumns(findSkuById, getProductionOrdersBySku) as ColumnDef<TData, TValue>[], 
+    [findSkuById, getProductionOrdersBySku, skus, productionOrders] // Dependencies for column regeneration
+  );
 
   const table = useReactTable({
     data,

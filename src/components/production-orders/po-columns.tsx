@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
@@ -9,11 +10,11 @@ import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
-import { useAppContext } from "@/contexts/app-context";
+// Removed: import { useAppContext } from "@/contexts/app-context";
 
 
-export const getPoColumns = (): ColumnDef<ProductionOrder>[] => {
-  const { findSkuById } = useAppContext(); // Hook needs to be called within a component or custom hook
+export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): ColumnDef<ProductionOrder>[] => {
+  // Removed: const { findSkuById } = useAppContext(); 
 
   return [
     {

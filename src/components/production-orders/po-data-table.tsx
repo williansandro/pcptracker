@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -25,11 +26,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { DataTablePagination } from "@/components/data-table-pagination";
 import { PoFormDialog } from "./po-form-dialog";
-import { useAppContext } from "@/contexts/app-context"; // Import useAppContext
-import { getPoColumns } from "./po-columns"; // Import the function
+import { useAppContext } from "@/contexts/app-context"; 
+import { getPoColumns } from "./po-columns"; 
 
 interface PoDataTableProps<TData, TValue> {
-  // columns removed, will be generated dynamically
   data: TData[];
 }
 
@@ -41,8 +41,12 @@ export function PoDataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
-  // Generate columns dynamically using the hook
-  const columns = React.useMemo(() => getPoColumns() as ColumnDef<TData, TValue>[], [useAppContext]);
+  const { findSkuById } = useAppContext(); // Call hook at top level
+
+  const columns = React.useMemo(
+    () => getPoColumns(findSkuById) as ColumnDef<TData, TValue>[], 
+    [findSkuById] // Pass function and list it as dependency
+  );
 
 
   const table = useReactTable({
