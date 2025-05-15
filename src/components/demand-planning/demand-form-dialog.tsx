@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +29,7 @@ import type { Demand } from "@/types";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
-import { format, parse } from 'date-fns';
+import { format } from 'date-fns';
 
 const demandFormSchema = z.object({
   skuId: z.string().min(1, "SKU é obrigatório."),
@@ -48,24 +49,24 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   
-  const currentMonthYear = format(new Date(), 'yyyy-MM');
-
-  const defaultValues = demand
-    ? { skuId: demand.skuId, monthYear: demand.monthYear, targetQuantity: demand.targetQuantity }
-    : { skuId: "", monthYear: currentMonthYear, targetQuantity: 100 };
+  const getInitialFormValues = React.useCallback(() => {
+    const currentMonthYear = format(new Date(), 'yyyy-MM');
+    return demand
+      ? { skuId: demand.skuId, monthYear: demand.monthYear, targetQuantity: demand.targetQuantity }
+      : { skuId: "", monthYear: currentMonthYear, targetQuantity: 100 };
+  }, [demand]);
 
   const form = useForm<DemandFormValues>({
     resolver: zodResolver(demandFormSchema),
-    defaultValues,
+    defaultValues: getInitialFormValues(),
   });
 
   useEffect(() => {
-    if (demand) {
-      form.reset(demand);
-    } else {
-      form.reset(defaultValues);
+    // Reset form when dialog opens or when switching between add/edit mode (demand prop changes)
+    if (open) {
+      form.reset(getInitialFormValues());
     }
-  }, [demand, form, open, defaultValues]);
+  }, [demand, open, form, getInitialFormValues]);
 
   const onSubmit = (data: DemandFormValues) => {
     try {
@@ -83,7 +84,7 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
         toast({ title: "Demanda Adicionada", description: `Demanda para ${data.monthYear} adicionada.` });
       }
       setOpen(false);
-      form.reset(defaultValues);
+      // No need to manually reset form here if it's reset when dialog opens/mode changes
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível salvar a Demanda.", variant: "destructive" });
       console.error("Error saving Demand:", error);
