@@ -1,23 +1,41 @@
+
 "use client";
 
 import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3 } from 'lucide-react';
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon } from 'lucide-react'; // Adicionado PieChartIcon, BarChartIcon
 import { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts'; // Adicionado PieChart, Pie, Cell, e outros para Recharts
+import type { ProductionOrderStatus } from '@/types';
+
+const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
+  Aberta: "hsl(var(--chart-3))", // Azul claro
+  "Em Progresso": "hsl(var(--chart-4))", // Laranja/Amarelo
+  Concluída: "hsl(var(--chart-2))", // Verde/Teal
+  Cancelada: "hsl(var(--chart-5))", // Vermelho/Cinza
+};
 
 export default function DashboardPage() {
-  const { skus, productionOrders } = useAppContext();
+  const { skus, productionOrders, findSkuById } = useAppContext();
 
   const totalSKUs = useMemo(() => skus.length, [skus]);
-  
-  const openPOs = useMemo(() => productionOrders.filter(po => po.status === 'Aberta' || po.status === 'Em Progresso').length, [productionOrders]);
-  
-  const completedPOs = useMemo(() => productionOrders.filter(po => po.status === 'Concluída').length, [productionOrders]);
+
+  const openPOsCount = useMemo(() => productionOrders.filter(po => po.status === 'Aberta').length, [productionOrders]);
+  const inProgressPOsCount = useMemo(() => productionOrders.filter(po => po.status === 'Em Progresso').length, [productionOrders]);
+  const totalOpenOrInProgressPOs = openPOsCount + inProgressPOsCount;
+
+  const completedPOsCount = useMemo(() => productionOrders.filter(po => po.status === 'Concluída').length, [productionOrders]);
 
   const avgProductionTime = useMemo(() => {
-    const completedWithTime = productionOrders.filter(po => po.status === 'Concluída' && po.productionTime);
+    const completedWithTime = productionOrders.filter(po => po.status === 'Concluída' && po.productionTime && po.productionTime > 0);
     if (completedWithTime.length === 0) return 'N/D';
     const totalTimeSeconds = completedWithTime.reduce((sum, po) => sum + (po.productionTime || 0), 0);
     const avgTimeSeconds = totalTimeSeconds / completedWithTime.length;
@@ -26,12 +44,44 @@ export default function DashboardPage() {
     return `${hours > 0 ? `${hours}h ` : ''}${minutes}m`;
   }, [productionOrders]);
 
+  const productionOrderStatusData = useMemo(() => {
+    const statusCounts = productionOrders.reduce((acc, po) => {
+      acc[po.status] = (acc[po.status] || 0) + 1;
+      return acc;
+    }, {} as Record<ProductionOrderStatus, number>);
+
+    return (Object.keys(statusCounts) as ProductionOrderStatus[]).map(status => ({
+      name: status,
+      value: statusCounts[status],
+      fill: STATUS_COLORS[status] || "hsl(var(--muted))",
+    })).filter(item => item.value > 0);
+  }, [productionOrders]);
+
+  const topSkusByProducedQuantityData = useMemo(() => {
+    const skuProduction: Record<string, number> = {};
+    productionOrders.forEach(po => {
+      if (po.status === 'Concluída' && po.producedQuantity && po.producedQuantity > 0) {
+        const sku = findSkuById(po.skuId);
+        if (sku) {
+          skuProduction[sku.code] = (skuProduction[sku.code] || 0) + po.producedQuantity;
+        }
+      }
+    });
+
+    return Object.entries(skuProduction)
+      .map(([skuCode, totalProduced]) => ({ skuCode, totalProduced }))
+      .sort((a, b) => b.totalProduced - a.totalProduced)
+      .slice(0, 5)
+      .map((item, index) => ({ ...item, fill: `hsl(var(--chart-${index + 1}))` }));
+  }, [productionOrders, findSkuById]);
+
+
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" />
-        <MetricCard title="Ordens Abertas" value={openPOs} icon={Factory} description="Ordens em aberto ou em progresso" />
-        <MetricCard title="Ordens Concluídas" value={completedPOs} icon={CheckCircle2} description="Ordens de produção finalizadas" />
+        <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description="Ordens pendentes ou em execução" />
+        <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description="Ordens de produção finalizadas" />
         <MetricCard title="Tempo Médio de Produção" value={avgProductionTime} icon={Clock3} description="Tempo médio por ordem concluída" />
       </div>
 
@@ -39,16 +89,94 @@ export default function DashboardPage() {
         <ProductionChart />
         <DemandFulfillmentCard />
       </div>
-      
-      {/* Placeholder para mais gráficos ou tabelas */}
-      {/* <Card>
-        <CardHeader>
-          <CardTitle>Desempenho por SKU</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Gráfico de desempenho por SKU em breve.</p>
-        </CardContent>
-      </Card> */}
+
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChartIcon className="h-5 w-5 text-primary" />
+              Distribuição de Status das OPs
+            </CardTitle>
+            <CardDescription>Visão geral dos status das ordens de produção atuais.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {productionOrderStatusData.length > 0 ? (
+              <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
+                <RechartsResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <RechartsTooltip
+                      cursor={{ fill: "hsl(var(--muted))" }}
+                      content={<ChartTooltipContent hideLabel />}
+                    />
+                    <Pie
+                      data={productionOrderStatusData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      labelLine={false}
+                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                        const RADIAN = Math.PI / 180;
+                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                        return (percent * 100) > 5 ? ( // Only show label if percentage is > 5%
+                          <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                            {`${(percent * 100).toFixed(0)}%`}
+                          </text>
+                        ) : null;
+                      }}
+                    >
+                      {productionOrderStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <RechartsLegend />
+                  </PieChart>
+                </RechartsResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="text-center text-muted-foreground py-10">Nenhuma ordem de produção para exibir status.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChartIcon className="h-5 w-5 text-primary" />
+              Top 5 SKUs por Quantidade Produzida
+            </CardTitle>
+            <CardDescription>SKUs com maior volume de produção (ordens concluídas).</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {topSkusByProducedQuantityData.length > 0 ? (
+              <ChartContainer config={{}} className="aspect-video max-h-[300px]">
+                 <RechartsResponsiveContainer width="100%" height={300}>
+                  <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20 }}>
+                    <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis dataKey="skuCode" type="category" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    <RechartsTooltip
+                        cursor={{ fill: 'hsl(var(--muted))' }}
+                        contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                        formatter={(value: number) => [value.toLocaleString('pt-BR') + ' un.', 'Produzido']}
+                    />
+                    <Bar dataKey="totalProduced" radius={[0, 4, 4, 0]}>
+                       {topSkusByProducedQuantityData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </RechartsResponsiveContainer>
+              </ChartContainer>
+            ) : (
+               <p className="text-center text-muted-foreground py-10">Nenhuma produção concluída para exibir o top SKUs.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
+
