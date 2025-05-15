@@ -77,13 +77,17 @@ const initializeDummyData = (): { skus: SKU[], productionOrders: ProductionOrder
   return { skus: initialSkus, productionOrders: initialProductionOrders, demands: initialDemands };
 };
 
+interface DeleteSelectedSkusResult {
+  deletedCount: number;
+  notDeleted: { code: string; reason: string }[];
+}
 
 interface AppContextType {
   skus: SKU[];
   addSku: (skuData: Omit<SKU, 'id' | 'createdAt'>) => void;
   updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => void;
   deleteSku: (skuId: string) => void;
-  deleteSelectedSkus: (skuIds: string[]) => void;
+  deleteSelectedSkus: (skuIds: string[]) => DeleteSelectedSkusResult;
   findSkuById: (skuId: string) => SKU | undefined;
 
   productionOrders: ProductionOrder[];
@@ -166,16 +170,52 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const deleteSku = useCallback((skuId: string) => {
-    setSkus(prev => prev.filter(s => s.id !== skuId));
-    setProductionOrders(prevPOs => prevPOs.filter(po => po.skuId !== skuId));
-    setDemands(prevDemands => prevDemands.filter(d => d.skuId !== skuId));
-  }, []);
+    const sku = skus.find(s => s.id === skuId);
+    const associatedPOs = productionOrders.filter(po => po.skuId === skuId);
+    const associatedDemands = demands.filter(d => d.skuId === skuId);
 
-  const deleteSelectedSkus = useCallback((skuIds: string[]) => {
-    setSkus(prev => prev.filter(s => !skuIds.includes(s.id)));
-    setProductionOrders(prevPOs => prevPOs.filter(po => !skuIds.includes(po.skuId)));
-    setDemands(prevDemands => prevDemands.filter(d => !skuIds.includes(d.skuId)));
-  }, []);
+    let reasons = [];
+    if (associatedPOs.length > 0) reasons.push("Ordens de Produção");
+    if (associatedDemands.length > 0) reasons.push("Demandas");
+
+    if (reasons.length > 0) {
+      throw new Error(`O SKU ${sku?.code || skuId} não pode ser excluído pois possui ${reasons.join(' e ')} associada(s).`);
+    }
+
+    setSkus(prev => prev.filter(s => s.id !== skuId));
+  }, [productionOrders, demands, skus]);
+
+  const deleteSelectedSkus = useCallback((skuIds: string[]): DeleteSelectedSkusResult => {
+    const skusToDelete: string[] = [];
+    const skusNotDeleted: { code: string; reason: string }[] = [];
+
+    skuIds.forEach(skuId => {
+      const sku = skus.find(s => s.id === skuId);
+      if (!sku) return;
+
+      const associatedPOs = productionOrders.filter(po => po.skuId === skuId);
+      const associatedDemands = demands.filter(d => d.skuId === skuId);
+
+      let reasons = [];
+      if (associatedPOs.length > 0) reasons.push("Ordens de Produção");
+      if (associatedDemands.length > 0) reasons.push("Demandas");
+
+      if (reasons.length > 0) {
+        skusNotDeleted.push({ code: sku.code, reason: reasons.join(' e ') });
+      } else {
+        skusToDelete.push(skuId);
+      }
+    });
+
+    if (skusToDelete.length > 0) {
+      setSkus(prev => prev.filter(s => !skusToDelete.includes(s.id)));
+    }
+    
+    return {
+      deletedCount: skusToDelete.length,
+      notDeleted: skusNotDeleted,
+    };
+  }, [productionOrders, demands, skus]);
 
   const findSkuById = useCallback((skuId: string) => skus.find(s => s.id === skuId), [skus]);
 

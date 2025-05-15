@@ -1,3 +1,4 @@
+
 "use client";
 
 import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -38,10 +39,14 @@ export function SkuActions({ sku }: SkuActionsProps) {
 
   const handleDelete = () => {
     try {
-      deleteSku(sku.id);
+      deleteSku(sku.id); // Esta função agora lança um erro se houver dependências
       toast({ title: "SKU Excluído", description: `SKU ${sku.code} excluído com sucesso.` });
-    } catch (error) {
-      toast({ title: "Erro", description: "Não foi possível excluir o SKU.", variant: "destructive" });
+    } catch (error: any) {
+      toast({ 
+        title: "Erro ao Excluir SKU", 
+        description: error.message || "Não foi possível excluir o SKU devido a dependências.", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -77,6 +82,7 @@ export function SkuActions({ sku }: SkuActionsProps) {
           <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
           <AlertDialogDescription>
             Tem certeza que deseja excluir o SKU "{sku.code} - {sku.description}"? Esta ação não pode ser desfeita.
+            Se o SKU estiver vinculado a Ordens de Produção ou Demandas, ele não poderá ser excluído.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -89,3 +95,4 @@ export function SkuActions({ sku }: SkuActionsProps) {
     </AlertDialog>
   );
 }
+

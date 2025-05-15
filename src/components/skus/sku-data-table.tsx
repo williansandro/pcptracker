@@ -13,7 +13,6 @@ import {
   type SortingState,
   type VisibilityState,
   type ColumnFiltersState,
-  type Row,
 } from "@tanstack/react-table";
 
 import {
@@ -86,16 +85,43 @@ export function SkuDataTable<TData extends SKU, TValue>({
   const handleDeleteSelected = () => {
     const idsToDelete = selectedRows.map(row => row.original.id);
     try {
-      deleteSelectedSkus(idsToDelete);
+      const result = deleteSelectedSkus(idsToDelete);
+      
+      let toastTitle = "Resultado da Exclusão";
+      const descriptions: string[] = [];
+
+      if (result.deletedCount > 0) {
+        descriptions.push(`${result.deletedCount} SKU(s) foram excluído(s) com sucesso.`);
+        if (result.notDeleted.length === 0) {
+          toastTitle = "SKUs Excluídos";
+        }
+      }
+
+      if (result.notDeleted.length > 0) {
+        const notDeletedMessages = result.notDeleted.map(item => `"${item.code}" (possui ${item.reason})`).join(', ');
+        descriptions.push(`${result.notDeleted.length} SKU(s) não puderam ser excluídos: ${notDeletedMessages}.`);
+        if (result.deletedCount === 0) {
+          toastTitle = "Falha ao Excluir SKUs";
+        }
+      }
+      
+      if (descriptions.length > 0) {
+        toast({
+          title: toastTitle,
+          description: descriptions.join(' '),
+          variant: result.deletedCount > 0 && result.notDeleted.length === 0 ? "default" : (result.notDeleted.length > 0 ? "destructive" : "default"),
+          duration: (result.notDeleted.length > 0 || result.deletedCount > 0) ? 7000 : 5000,
+        });
+      }
+
+
+      if (result.deletedCount > 0) {
+        table.resetRowSelection();
+      }
+    } catch (error: any) {
       toast({
-        title: "SKUs Excluídos",
-        description: `${idsToDelete.length} SKU(s) e seus dados associados foram excluídos com sucesso.`,
-      });
-      table.resetRowSelection();
-    } catch (error) {
-      toast({
-        title: "Erro ao Excluir",
-        description: "Não foi possível excluir os SKUs selecionados.",
+        title: "Erro Inesperado ao Excluir",
+        description: error.message || "Não foi possível excluir os SKUs selecionados.",
         variant: "destructive",
       });
     }
@@ -127,8 +153,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
                   <AlertDialogTitle>Confirmar Exclusão em Massa</AlertDialogTitle>
                   <AlertDialogDescription>
                     Tem certeza que deseja excluir {selectedRows.length} SKU(s) selecionado(s)?
-                    Todas as Ordens de Produção e Demandas associadas a estes SKUs também serão excluídas.
-                    Esta ação não pode ser desfeita.
+                    SKUs vinculados a Ordens de Produção ou Demandas não serão excluídos. Esta ação não pode ser desfeita para os SKUs elegíveis.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
