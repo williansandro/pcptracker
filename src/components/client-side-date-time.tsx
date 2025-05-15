@@ -4,12 +4,13 @@
 import { useState, useEffect } from 'react';
 import { format, parse, parseISO } from 'date-fns';
 import type { Locale } from 'date-fns';
+import { ptBR } from 'date-fns/locale'; // Importar ptBR
 
 interface ClientSideDateTimeProps {
   dateString: string | undefined | null;
   outputFormat: string;
-  inputFormat?: string; // e.g., 'yyyy-MM' for parsing non-ISO strings
-  locale?: Locale; // For date-fns localization
+  inputFormat?: string; 
+  locale?: Locale; 
   placeholder?: string;
 }
 
@@ -17,8 +18,8 @@ export function ClientSideDateTime({
   dateString,
   outputFormat,
   inputFormat,
-  locale,
-  placeholder = "...",
+  locale = ptBR, // Definir ptBR como padrão
+  placeholder = "Carregando...",
 }: ClientSideDateTimeProps) {
   const [formattedOutput, setFormattedOutput] = useState<string>(placeholder);
 
@@ -27,10 +28,8 @@ export function ClientSideDateTime({
       try {
         let date: Date;
         if (inputFormat) {
-          // Use current date as a base for parsing if day/month/year parts are missing
           date = parse(dateString, inputFormat, new Date()); 
         } else {
-          // Assume ISO string if no inputFormat is provided
           date = parseISO(dateString); 
         }
         
@@ -38,12 +37,10 @@ export function ClientSideDateTime({
         setFormattedOutput(format(date, outputFormat, formatOptions));
 
       } catch (error) {
-        console.error(`Error formatting date string "${dateString}" with input format "${inputFormat}" and output format "${outputFormat}":`, error);
-        // Fallback to original string or a more informative error placeholder on parsing/formatting error
+        console.error(`Erro ao formatar data "${dateString}" com formato de entrada "${inputFormat}" e formato de saída "${outputFormat}":`, error);
         setFormattedOutput(dateString || placeholder); 
       }
     } else {
-      // Handles null or undefined dateString by showing placeholder
       setFormattedOutput(placeholder); 
     }
   }, [dateString, outputFormat, inputFormat, locale, placeholder]);

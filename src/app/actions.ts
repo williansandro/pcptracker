@@ -14,6 +14,8 @@ export async function getAIProductionAnalysis(
     };
   }
 
+  // A string de dados de produção pode permanecer em inglês se o prompt da IA for em inglês.
+  // A IA é instruída a fornecer a saída em um formato JSON específico.
   const productionDataString = entries
     .map(entry => `SKU: ${entry.skuCode}, Quantidade: ${entry.quantityProduced}, Tempo: ${entry.productionTimeMinutes} min`)
     .join('; ');
@@ -24,12 +26,17 @@ export async function getAIProductionAnalysis(
 
   try {
     const result = await improveProductionTimes(input);
+    // As chaves 'analysis' e 'suggestions' são definidas pelo schema de saída da IA.
+    // Se a IA for instruída a responder em português, o conteúdo dessas chaves estará em português.
+    // Se a IA responder em inglês, a tradução precisaria acontecer aqui ou no frontend.
+    // Assumindo que a IA pode retornar texto em português se o prompt for ajustado,
+    // ou que o prompt já pede para considerar o idioma.
     return result;
   } catch (error) {
-    console.error("Error calling AI production analysis:", error);
+    console.error("Erro ao chamar a análise de produção da IA:", error);
     return {
-      analysis: "Erro ao analisar os dados de produção.",
-      suggestions: "Não foi possível obter sugestões de IA. Tente novamente mais tarde.",
+      analysis: "Erro ao analisar os dados de produção com a IA.",
+      suggestions: "Não foi possível obter sugestões da IA. Tente novamente mais tarde.",
     };
   }
 }

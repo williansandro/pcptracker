@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Target } from 'lucide-react';
 import { useMemo } from 'react';
+import { format, getMonth, getYear } from 'date-fns';
 
 export function DemandFulfillmentCard() {
   const { demands, productionOrders } = useAppContext();
@@ -14,7 +15,8 @@ export function DemandFulfillmentCard() {
       return { totalTarget: 0, totalProduced: 0, percentage: 0 };
     }
 
-    const currentMonthYear = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const currentDate = new Date();
+    const currentMonthYear = format(currentDate, 'yyyy-MM');
 
     const currentMonthDemands = demands.filter(d => d.monthYear === currentMonthYear);
     const totalTarget = currentMonthDemands.reduce((sum, d) => sum + d.targetQuantity, 0);
@@ -22,7 +24,7 @@ export function DemandFulfillmentCard() {
     let totalProduced = 0;
     currentMonthDemands.forEach(demand => {
       const completedPOsForSku = productionOrders.filter(
-        po => po.skuId === demand.skuId && po.status === 'Completed' && po.endTime?.startsWith(currentMonthYear)
+        po => po.skuId === demand.skuId && po.status === 'Concluída' && po.endTime?.startsWith(currentMonthYear)
       );
       totalProduced += completedPOsForSku.reduce((sum, po) => sum + po.quantity, 0);
     });
@@ -41,7 +43,7 @@ export function DemandFulfillmentCard() {
       <CardContent>
         <div className="text-2xl font-bold">{fulfillmentData.percentage}%</div>
         <p className="text-xs text-muted-foreground">
-          {fulfillmentData.totalProduced.toLocaleString()} de {fulfillmentData.totalTarget.toLocaleString()} unidades
+          {fulfillmentData.totalProduced.toLocaleString('pt-BR')} de {fulfillmentData.totalTarget.toLocaleString('pt-BR')} unidades
         </p>
         <Progress value={fulfillmentData.percentage} className="mt-2 h-3" />
       </CardContent>

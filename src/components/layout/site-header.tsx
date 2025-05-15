@@ -1,5 +1,5 @@
 import { APP_NAME } from '@/lib/constants';
-import { SidebarTrigger } from '@/components/ui/sidebar';
+// import { SidebarTrigger } from '@/components/ui/sidebar'; // Não utilizado aqui diretamente
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
@@ -10,7 +10,6 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 hidden md:flex">
-          {/* <SidebarTrigger className="hidden lg:flex" /> */}
           <span className="font-bold text-lg">{APP_NAME}</span>
         </div>
 
@@ -20,7 +19,7 @@ export function SiteHeader() {
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
                 <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle Menu</span>
+                <span className="sr-only">Abrir Menu</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[260px] p-0 pt-6 bg-sidebar text-sidebar-foreground">
@@ -34,7 +33,7 @@ export function SiteHeader() {
         </div>
         
         <div className="flex flex-1 items-center justify-end space-x-2">
-          {/* Add User Profile Dropdown or Theme Toggle here if needed */}
+          {/* Adicionar Perfil de Usuário ou Seletor de Tema aqui se necessário */}
         </div>
       </div>
     </header>

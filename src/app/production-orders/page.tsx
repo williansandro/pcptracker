@@ -1,7 +1,6 @@
 "use client";
 
 import { useAppContext } from "@/contexts/app-context";
-// Removed direct import of poColumns, as PoDataTable will handle it
 import { PoDataTable } from "@/components/production-orders/po-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -18,7 +17,6 @@ export default function ProductionOrdersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Columns prop is removed as PoDataTable now generates them internally */}
           <PoDataTable data={productionOrders} />
         </CardContent>
       </Card>

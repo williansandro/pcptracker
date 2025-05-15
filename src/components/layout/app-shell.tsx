@@ -8,21 +8,19 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarInset,
-  SidebarTrigger,
+  // SidebarTrigger, // Comentado pois o trigger está no SidebarHeader implicitamente
 } from '@/components/ui/sidebar';
 import { MainNav } from './main-nav';
 import { SiteHeader } from './site-header';
 import { APP_NAME } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut } from 'lucide-react';
+import { Settings } from 'lucide-react'; // Removido LogOut, pois não está em uso
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
-  // The sidebar state is persisted in a cookie by default by the SidebarProvider
-  // defaultOpen can be set to false if you prefer it collapsed initially
   return (
     <SidebarProvider defaultOpen={true} open={true} >
       <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r">
@@ -43,7 +41,6 @@ export function AppShell({ children }: AppShellProps) {
           <MainNav />
         </SidebarContent>
         <SidebarFooter className="p-2 border-t border-sidebar-border">
-           {/* Placeholder for user settings or logout */}
            <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center">
             <Settings className="h-5 w-5" />
             <span className="group-data-[collapsible=icon]:hidden ml-2">Configurações</span>

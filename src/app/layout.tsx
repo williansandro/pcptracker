@@ -5,15 +5,16 @@ import { cn } from '@/lib/utils';
 import { AppContextProvider } from '@/contexts/app-context';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from "@/components/ui/toaster";
+import { APP_NAME } from '@/lib/constants';
 
 const fontSans = FontSans({
   subsets: ['latin'],
-  variable: '--font-sans', // Changed from --font-geist-sans to --font-sans for consistency
+  variable: '--font-sans',
 });
 
 export const metadata: Metadata = {
-  title: 'Pcp Tracker',
-  description: 'Production Control and Planning Tracker',
+  title: APP_NAME,
+  description: 'Controle e Planejamento da Produção',
 };
 
 export default function RootLayout({
@@ -22,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",

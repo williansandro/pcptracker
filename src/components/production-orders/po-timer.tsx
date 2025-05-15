@@ -22,18 +22,18 @@ export function PoTimer({ productionOrder }: PoTimerProps) {
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
 
-    if (productionOrder.status === 'In Progress' && productionOrder.startTime) {
+    if (productionOrder.status === 'Em Progresso' && productionOrder.startTime) {
       const updateTimer = () => {
         const now = new Date().getTime();
         const start = new Date(productionOrder.startTime!).getTime();
         setElapsedTime(Math.floor((now - start) / 1000));
       };
-      updateTimer(); // Initial update
+      updateTimer(); 
       intervalId = setInterval(updateTimer, 1000);
-    } else if (productionOrder.status === 'Completed' && productionOrder.productionTime) {
+    } else if (productionOrder.status === 'Concluída' && productionOrder.productionTime) {
       setElapsedTime(productionOrder.productionTime);
     } else {
-      setElapsedTime(0);
+      setElapsedTime(0); // Para status 'Aberta' ou 'Cancelada' ou se não houver tempo.
     }
 
     return () => {
@@ -41,7 +41,7 @@ export function PoTimer({ productionOrder }: PoTimerProps) {
     };
   }, [productionOrder.status, productionOrder.startTime, productionOrder.productionTime]);
 
-  if (productionOrder.status === 'Open' || productionOrder.status === 'Cancelled') {
+  if (productionOrder.status === 'Aberta' || productionOrder.status === 'Cancelada' || (!productionOrder.startTime && !productionOrder.productionTime)) {
     return <span className="text-sm text-muted-foreground">-</span>;
   }
 

@@ -9,8 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-// Removed: import { format } from 'date-fns'; 
 import { ClientSideDateTime } from "@/components/client-side-date-time";
+import { ptBR } from 'date-fns/locale';
 
 
 export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): ColumnDef<ProductionOrder>[] => {
@@ -53,6 +53,7 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
+      cell: ({ row }) => (row.getValue("quantity") as number).toLocaleString('pt-BR'),
     },
     {
       accessorKey: "status",
@@ -65,17 +66,30 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         let variant: "default" | "secondary" | "destructive" | "outline" = "default";
-        if (status === "Completed") variant = "default"; 
-        else if (status === "In Progress") variant = "outline"; 
-        else if (status === "Open") variant = "secondary";
-        else if (status === "Cancelled") variant = "destructive";
+        let className = "";
         
-        return <Badge variant={variant} className={
-          status === "Completed" ? "bg-green-500 hover:bg-green-600 text-white" :
-          status === "In Progress" ? "bg-yellow-500 hover:bg-yellow-600 text-black" :
-          status === "Open" ? "bg-blue-500 hover:bg-blue-600 text-white" :
-          status === "Cancelled" ? "bg-red-500 hover:bg-red-600 text-white" : ""
-        }>{status}</Badge>;
+        switch (status) {
+          case "Concluída":
+            variant = "default";
+            className = "bg-green-500 hover:bg-green-600 text-white";
+            break;
+          case "Em Progresso":
+            variant = "outline";
+            className = "bg-yellow-500 hover:bg-yellow-600 text-black";
+            break;
+          case "Aberta":
+            variant = "secondary";
+            className = "bg-blue-500 hover:bg-blue-600 text-white";
+            break;
+          case "Cancelada":
+            variant = "destructive";
+            className = "bg-red-500 hover:bg-red-600 text-white";
+            break;
+          default:
+            variant = "default";
+        }
+        
+        return <Badge variant={variant} className={className}>{status}</Badge>;
       },
     },
     {
@@ -93,7 +107,7 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
       ),
       cell: ({ row }) => {
         const dateString = row.getValue("createdAt") as string;
-        return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" /></div>;
+        return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" locale={ptBR} /></div>;
       },
     },
     {

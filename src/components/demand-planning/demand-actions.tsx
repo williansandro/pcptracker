@@ -32,13 +32,14 @@ interface DemandActionsProps {
 }
 
 export function DemandActions({ demand }: DemandActionsProps) {
-  const { deleteDemand } = useAppContext();
+  const { deleteDemand, findSkuById } = useAppContext();
   const { toast } = useToast();
+  const sku = findSkuById(demand.skuId);
 
   const handleDelete = () => {
     try {
       deleteDemand(demand.id);
-      toast({ title: "Demanda Excluída", description: `Demanda para ${demand.monthYear} excluída.` });
+      toast({ title: "Demanda Excluída", description: `Demanda para ${sku?.code || 'SKU'} de ${demand.monthYear} excluída.` });
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível excluir a demanda.", variant: "destructive" });
     }
@@ -75,7 +76,7 @@ export function DemandActions({ demand }: DemandActionsProps) {
         <AlertDialogHeader>
           <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja excluir esta demanda? Esta ação não pode ser desfeita.
+            Tem certeza que deseja excluir esta demanda ({sku?.code || 'SKU'} - {demand.monthYear})? Esta ação não pode ser desfeita.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

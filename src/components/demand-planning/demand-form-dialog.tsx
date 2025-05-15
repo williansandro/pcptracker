@@ -26,14 +26,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/app-context";
 import type { Demand } from "@/types";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import { format } from 'date-fns';
 
 const demandFormSchema = z.object({
   skuId: z.string().min(1, "SKU é obrigatório."),
-  monthYear: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Formato de Mês/Ano inválido (YYYY-MM)."),
+  monthYear: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Formato de Mês/Ano inválido (AAAA-MM). Ex: 2024-07").min(7, "Mês/Ano é obrigatório."),
   targetQuantity: z.coerce.number().min(1, "Quantidade alvo deve ser pelo menos 1."),
 });
 
@@ -45,11 +45,11 @@ interface DemandFormDialogProps {
 }
 
 export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
-  const { skus, addDemand, updateDemand, findDemandBySkuAndMonth } = useAppContext();
+  const { skus, addDemand, updateDemand, findDemandBySkuAndMonth, findSkuById } = useAppContext();
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   
-  const getInitialFormValues = React.useCallback(() => {
+  const getInitialFormValues = useCallback(() => {
     const currentMonthYear = format(new Date(), 'yyyy-MM');
     return demand
       ? { skuId: demand.skuId, monthYear: demand.monthYear, targetQuantity: demand.targetQuantity }
@@ -62,7 +62,6 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
   });
 
   useEffect(() => {
-    // Reset form when dialog opens or when switching between add/edit mode (demand prop changes)
     if (open) {
       form.reset(getInitialFormValues());
     }
@@ -71,20 +70,20 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
   const onSubmit = (data: DemandFormValues) => {
     try {
       const existingDemandForMonth = findDemandBySkuAndMonth(data.skuId, data.monthYear);
+      const sku = findSkuById(data.skuId);
       if (existingDemandForMonth && (!demand || existingDemandForMonth.id !== demand.id)) {
-        toast({ title: "Demanda Duplicada", description: `Já existe uma demanda para este SKU e mês.`, variant: "destructive" });
+        toast({ title: "Demanda Duplicada", description: `Já existe uma demanda para o SKU ${sku?.code || ''} no mês ${data.monthYear}.`, variant: "destructive" });
         return;
       }
 
       if (demand) {
         updateDemand(demand.id, data);
-        toast({ title: "Demanda Atualizada", description: `Demanda para ${data.monthYear} atualizada.` });
+        toast({ title: "Demanda Atualizada", description: `Demanda para ${sku?.code || ''} de ${data.monthYear} atualizada.` });
       } else {
         addDemand(data);
-        toast({ title: "Demanda Adicionada", description: `Demanda para ${data.monthYear} adicionada.` });
+        toast({ title: "Demanda Adicionada", description: `Demanda para ${sku?.code || ''} de ${data.monthYear} adicionada.` });
       }
       setOpen(false);
-      // No need to manually reset form here if it's reset when dialog opens/mode changes
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível salvar a Demanda.", variant: "destructive" });
       console.error("Error saving Demand:", error);
@@ -136,7 +135,7 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
               name="monthYear"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Mês/Ano (YYYY-MM)</FormLabel>
+                  <FormLabel>Mês/Ano (AAAA-MM)</FormLabel>
                   <FormControl>
                     <Input type="month" {...field} />
                   </FormControl>
@@ -151,7 +150,7 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
                 <FormItem>
                   <FormLabel>Quantidade Alvo</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="500" {...field} />
+                    <Input type="number" placeholder="100" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

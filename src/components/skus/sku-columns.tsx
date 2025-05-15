@@ -7,8 +7,8 @@ import { SkuActions } from "./sku-actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-// Removed: import { format } from 'date-fns';
 import { ClientSideDateTime } from "@/components/client-side-date-time";
+import { ptBR } from 'date-fns/locale';
 
 export const skuColumns: ColumnDef<SKU>[] = [
   {
@@ -68,7 +68,7 @@ export const skuColumns: ColumnDef<SKU>[] = [
     },
     cell: ({ row }) => {
       const dateString = row.getValue("createdAt") as string;
-      return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" /></div>;
+      return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" locale={ptBR} /></div>;
     },
   },
   {

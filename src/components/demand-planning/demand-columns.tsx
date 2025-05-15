@@ -8,15 +8,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-// Removed: import { useAppContext } from "@/contexts/app-context";
-import { format, parse } from 'date-fns';
+import { ClientSideDateTime } from "@/components/client-side-date-time";
 import { ptBR } from 'date-fns/locale';
 
 export const getDemandColumns = (
   findSkuById: (skuId: string) => SKU | undefined,
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[]
 ): ColumnDef<Demand>[] => {
-  // Removed: const { findSkuById, getProductionOrdersBySku } = useAppContext();
 
   return [
     {
@@ -59,12 +57,7 @@ export const getDemandColumns = (
       ),
       cell: ({ row }) => {
         const monthYearStr = row.getValue("monthYear") as string;
-        try {
-          const date = parse(monthYearStr, 'yyyy-MM', new Date());
-          return format(date, "MMMM yyyy", { locale: ptBR });
-        } catch {
-          return monthYearStr; // Fallback if parsing fails
-        }
+        return <ClientSideDateTime dateString={monthYearStr} inputFormat="yyyy-MM" outputFormat="MMMM yyyy" locale={ptBR} />;
       }
     },
     {
@@ -75,7 +68,7 @@ export const getDemandColumns = (
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => (row.getValue("targetQuantity") as number).toLocaleString(),
+      cell: ({ row }) => (row.getValue("targetQuantity") as number).toLocaleString('pt-BR'),
     },
     {
       id: "producedQuantity",
@@ -84,9 +77,9 @@ export const getDemandColumns = (
         const demand = row.original;
         const productionOrders = getProductionOrdersBySku(demand.skuId);
         const producedInMonth = productionOrders
-          .filter(po => po.status === 'Completed' && po.endTime?.startsWith(demand.monthYear))
+          .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear))
           .reduce((sum, po) => sum + po.quantity, 0);
-        return producedInMonth.toLocaleString();
+        return producedInMonth.toLocaleString('pt-BR');
       },
     },
     {
@@ -96,7 +89,7 @@ export const getDemandColumns = (
         const demand = row.original;
         const productionOrders = getProductionOrdersBySku(demand.skuId);
         const producedInMonth = productionOrders
-          .filter(po => po.status === 'Completed' && po.endTime?.startsWith(demand.monthYear))
+          .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear))
           .reduce((sum, po) => sum + po.quantity, 0);
         
         const progressPercentage = demand.targetQuantity > 0 

@@ -14,11 +14,11 @@ import {
 import { Brain, Loader2 } from 'lucide-react';
 import type { ProductionOrder, SKU, ProductionDataEntry } from '@/types';
 import { getAIProductionAnalysis } from '@/app/actions';
-import { useAppContext } from '@/contexts/app-context';
+// import { useAppContext } from '@/contexts/app-context'; // Não usado diretamente
 import { useToast } from '@/hooks/use-toast';
 
 interface AiAnalysisDialogProps {
-  productionOrdersForSku: ProductionOrder[]; // Only completed orders for a specific SKU
+  productionOrdersForSku: ProductionOrder[]; 
   sku: SKU;
 }
 
@@ -33,17 +33,17 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
     setAnalysisResult(null);
 
     const productionData: ProductionDataEntry[] = productionOrdersForSku
-      .filter(po => po.status === 'Completed' && po.productionTime && po.productionTime > 0)
+      .filter(po => po.status === 'Concluída' && po.productionTime && po.productionTime > 0)
       .map(po => ({
         skuCode: sku.code,
         quantityProduced: po.quantity,
-        productionTimeMinutes: Math.round(po.productionTime! / 60),
+        productionTimeMinutes: Math.round(po.productionTime! / 60), // productionTime é em segundos
       }));
 
     if (productionData.length === 0) {
       toast({
         title: "Dados Insuficientes",
-        description: `Não há dados de produção concluídos suficientes para ${sku.code} para análise.`,
+        description: `Não há dados de produção concluídos suficientes para o SKU ${sku.code} para análise.`,
         variant: "default",
       });
       setIsLoading(false);
@@ -54,7 +54,7 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
       const result = await getAIProductionAnalysis(productionData);
       setAnalysisResult(result);
     } catch (error) {
-      console.error("AI Analysis Error:", error);
+      console.error("Erro na Análise de IA:", error);
       toast({
         title: "Erro na Análise",
         description: "Não foi possível obter a análise da IA.",
@@ -64,11 +64,19 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
       setIsLoading(false);
     }
   };
+  
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen && !analysisResult && !isLoading) { // Fetch analysis when dialog opens, if not already fetched/loading
+      handleFetchAnalysis();
+    }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" onClick={() => { if(!open) handleFetchAnalysis(); }}>
+        {/* O evento onClick foi movido para handleOpenChange para melhor controle */}
+        <Button variant="outline" size="sm"> 
           <Brain className="mr-2 h-4 w-4" /> Analisar com IA
         </Button>
       </DialogTrigger>
@@ -99,7 +107,7 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
             </>
           )}
           {!isLoading && !analysisResult && (
-             <p className="text-sm text-center text-muted-foreground p-4">Clique em "Analisar com IA" para carregar as sugestões.</p>
+             <p className="text-sm text-center text-muted-foreground p-4">A análise da IA será carregada aqui.</p>
           )}
         </div>
         <DialogFooter>
@@ -109,4 +117,3 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
     </Dialog>
   );
 }
-

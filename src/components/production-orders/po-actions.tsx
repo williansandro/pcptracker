@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, Edit, Trash2, PlayCircle, PauseCircle, CheckCircle2, Brain } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, PlayCircle, PauseCircle, CheckCircle2, XCircle } from "lucide-react"; // Adicionado XCircle para Cancelar
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -43,11 +43,12 @@ export function PoActions({ productionOrder }: PoActionsProps) {
     findSkuById,
   } = useAppContext();
   const { toast } = useToast();
+  const sku = findSkuById(productionOrder.skuId);
 
   const handleDelete = () => {
     try {
       deleteProductionOrder(productionOrder.id);
-      toast({ title: "Ordem de Produção Excluída", description: `OP excluída com sucesso.` });
+      toast({ title: "Ordem de Produção Excluída", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) excluída.` });
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível excluir a OP.", variant: "destructive" });
     }
@@ -55,30 +56,29 @@ export function PoActions({ productionOrder }: PoActionsProps) {
 
   const handleStartTimer = () => {
     startProductionOrderTimer(productionOrder.id);
-    toast({ title: "Produção Iniciada", description: `Timer iniciado para OP ${productionOrder.id.substring(0,8)}.` });
+    toast({ title: "Produção Iniciada", description: `Timer iniciado para OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}).` });
   };
 
   const handleStopTimer = () => {
     stopProductionOrderTimer(productionOrder.id);
-    toast({ title: "Produção Concluída", description: `Timer finalizado para OP ${productionOrder.id.substring(0,8)}.` });
+    toast({ title: "Produção Concluída", description: `Timer finalizado para OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}).` });
   };
   
   const handleCancelOrder = () => {
-    updateProductionOrder(productionOrder.id, { status: 'Cancelled' });
-    toast({ title: "Ordem Cancelada", description: `OP ${productionOrder.id.substring(0,8)} foi cancelada.` });
+    updateProductionOrder(productionOrder.id, { status: 'Cancelada' });
+    toast({ title: "Ordem Cancelada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) foi cancelada.` });
   };
 
-  const sku = findSkuById(productionOrder.skuId);
-  const completedOrdersForSku = sku ? getProductionOrdersBySku(sku.id).filter(po => po.status === 'Completed') : [];
+  const completedOrdersForSku = sku ? getProductionOrdersBySku(sku.id).filter(po => po.status === 'Concluída') : [];
 
   return (
     <div className="flex items-center space-x-1">
-      {productionOrder.status === 'Open' && (
+      {productionOrder.status === 'Aberta' && (
         <Button variant="ghost" size="icon" onClick={handleStartTimer} title="Iniciar Produção">
           <PlayCircle className="h-5 w-5 text-green-600" />
         </Button>
       )}
-      {productionOrder.status === 'In Progress' && (
+      {productionOrder.status === 'Em Progresso' && (
         <Button variant="ghost" size="icon" onClick={handleStopTimer} title="Finalizar Produção">
           <CheckCircle2 className="h-5 w-5 text-blue-600" />
         </Button>
@@ -98,19 +98,20 @@ export function PoActions({ productionOrder }: PoActionsProps) {
             <PoFormDialog
               productionOrder={productionOrder}
               trigger={
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={productionOrder.status === 'Completed' || productionOrder.status === 'Cancelled'}>
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={productionOrder.status === 'Concluída' || productionOrder.status === 'Cancelada'}>
                   <Edit className="mr-2 h-4 w-4" /> Editar
                 </DropdownMenuItem>
               }
             />
             {sku && completedOrdersForSku.length > 0 && (
                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                 {/* A DialogTrigger está dentro do AiAnalysisDialog agora */}
                  <AiAnalysisDialog productionOrdersForSku={completedOrdersForSku} sku={sku}/>
                </DropdownMenuItem>
             )}
-             {(productionOrder.status === 'Open' || productionOrder.status === 'In Progress') && (
+             {(productionOrder.status === 'Aberta' || productionOrder.status === 'Em Progresso') && (
               <DropdownMenuItem onClick={handleCancelOrder} className="text-orange-600 focus:text-orange-600 focus:bg-orange-500/10">
-                <PauseCircle className="mr-2 h-4 w-4" /> Cancelar Ordem
+                <XCircle className="mr-2 h-4 w-4" /> Cancelar Ordem
               </DropdownMenuItem>
             )}
             <AlertDialogTrigger asChild>
@@ -124,7 +125,7 @@ export function PoActions({ productionOrder }: PoActionsProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir esta Ordem de Produção ({productionOrder.id.substring(0,8)} - {sku?.code || ''})? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

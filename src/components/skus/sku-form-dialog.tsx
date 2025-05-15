@@ -25,19 +25,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppContext } from "@/contexts/app-context";
 import type { SKU } from "@/types";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit } from "lucide-react";
+import { PlusCircle } from "lucide-react"; // Edit icon não é usado aqui
 
 const skuFormSchema = z.object({
-  code: z.string().min(1, "Código é obrigatório").max(50, "Código muito longo"),
-  description: z.string().min(1, "Descrição é obrigatória").max(255, "Descrição muito longa"),
+  code: z.string().min(1, "Código é obrigatório").max(50, "Código não pode exceder 50 caracteres."),
+  description: z.string().min(1, "Descrição é obrigatória.").max(255, "Descrição não pode exceder 255 caracteres."),
 });
 
 type SkuFormValues = z.infer<typeof skuFormSchema>;
 
 interface SkuFormDialogProps {
-  sku?: SKU; // For editing
+  sku?: SKU; 
   trigger?: React.ReactNode;
 }
 
@@ -46,18 +46,21 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
+  const getInitialValues = useCallback(() => {
+    return sku ? { code: sku.code, description: sku.description } : { code: "", description: "" };
+  }, [sku]);
+  
+
   const form = useForm<SkuFormValues>({
     resolver: zodResolver(skuFormSchema),
-    defaultValues: sku ? { code: sku.code, description: sku.description } : { code: "", description: "" },
+    defaultValues: getInitialValues(),
   });
 
   useEffect(() => {
-    if (sku) {
-      form.reset({ code: sku.code, description: sku.description });
-    } else {
-      form.reset({ code: "", description: "" });
+    if(open) { // Reset form when dialog opens or sku prop changes
+      form.reset(getInitialValues());
     }
-  }, [sku, form, open]);
+  }, [sku, form, open, getInitialValues]);
 
 
   const onSubmit = (data: SkuFormValues) => {
@@ -70,10 +73,9 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
         toast({ title: "SKU Adicionado", description: `SKU ${data.code} adicionado com sucesso.` });
       }
       setOpen(false);
-      form.reset();
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível salvar o SKU.", variant: "destructive" });
-      console.error("Error saving SKU:", error);
+      console.error("Erro ao salvar SKU:", error);
     }
   };
 
@@ -102,7 +104,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                 <FormItem>
                   <FormLabel>Código do SKU</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: COMP001-X" {...field} />
+                    <Input placeholder="Ex: PROD001-AZ" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

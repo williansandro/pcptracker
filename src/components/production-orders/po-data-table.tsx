@@ -41,11 +41,11 @@ export function PoDataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
-  const { findSkuById } = useAppContext(); // Call hook at top level
+  const { findSkuById, skus } = useAppContext(); 
 
   const columns = React.useMemo(
     () => getPoColumns(findSkuById) as ColumnDef<TData, TValue>[], 
-    [findSkuById] // Pass function and list it as dependency
+    [findSkuById, skus] // Adicionado skus para re-renderizar colunas se SKUs mudarem
   );
 
 

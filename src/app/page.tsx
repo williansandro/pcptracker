@@ -12,13 +12,13 @@ export default function DashboardPage() {
 
   const totalSKUs = useMemo(() => skus.length, [skus]);
   
-  const openPOs = useMemo(() => productionOrders.filter(po => po.status === 'Open' || po.status === 'In Progress').length, [productionOrders]);
+  const openPOs = useMemo(() => productionOrders.filter(po => po.status === 'Aberta' || po.status === 'Em Progresso').length, [productionOrders]);
   
-  const completedPOs = useMemo(() => productionOrders.filter(po => po.status === 'Completed').length, [productionOrders]);
+  const completedPOs = useMemo(() => productionOrders.filter(po => po.status === 'Concluída').length, [productionOrders]);
 
   const avgProductionTime = useMemo(() => {
-    const completedWithTime = productionOrders.filter(po => po.status === 'Completed' && po.productionTime);
-    if (completedWithTime.length === 0) return 'N/A';
+    const completedWithTime = productionOrders.filter(po => po.status === 'Concluída' && po.productionTime);
+    if (completedWithTime.length === 0) return 'N/D';
     const totalTimeSeconds = completedWithTime.reduce((sum, po) => sum + (po.productionTime || 0), 0);
     const avgTimeSeconds = totalTimeSeconds / completedWithTime.length;
     const hours = Math.floor(avgTimeSeconds / 3600);
@@ -29,10 +29,10 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Total SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" />
+        <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" />
         <MetricCard title="Ordens Abertas" value={openPOs} icon={Factory} description="Ordens em aberto ou em progresso" />
         <MetricCard title="Ordens Concluídas" value={completedPOs} icon={CheckCircle2} description="Ordens de produção finalizadas" />
-        <MetricCard title="Tempo Médio Produção" value={avgProductionTime} icon={Clock3} description="Tempo médio por ordem concluída" />
+        <MetricCard title="Tempo Médio de Produção" value={avgProductionTime} icon={Clock3} description="Tempo médio por ordem concluída" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -40,7 +40,7 @@ export default function DashboardPage() {
         <DemandFulfillmentCard />
       </div>
       
-      {/* Placeholder for more charts or tables */}
+      {/* Placeholder para mais gráficos ou tabelas */}
       {/* <Card>
         <CardHeader>
           <CardTitle>Desempenho por SKU</CardTitle>

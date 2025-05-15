@@ -45,7 +45,7 @@ export function DemandDataTable<TData, TValue>({
   
   const columns = React.useMemo(
     () => getDemandColumns(findSkuById, getProductionOrdersBySku) as ColumnDef<TData, TValue>[], 
-    [findSkuById, getProductionOrdersBySku, skus, productionOrders] // Dependencies for column regeneration
+    [findSkuById, getProductionOrdersBySku, skus, productionOrders] 
   );
 
   const table = useReactTable({

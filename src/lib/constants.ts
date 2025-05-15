@@ -1,55 +1,84 @@
 import type { NavItem } from '@/components/layout/main-nav';
-import { LayoutDashboard, Package, Factory, TrendingUp, Settings } from 'lucide-react';
+import { LayoutDashboard, Package, Factory, TrendingUp } from 'lucide-react'; // Removido Settings, pois não há página de settings
+import type { SKU, ProductionOrder, Demand, ProductionOrderStatus } from '@/types';
 
-export const APP_NAME = "Pcp Tracker";
+export const APP_NAME = "PCP Tracker"; // PCP: Planejamento e Controle da Produção
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/', label: 'Painel Principal', icon: LayoutDashboard },
   { href: '/skus', label: 'SKUs', icon: Package },
   { href: '/production-orders', label: 'Ordens de Produção', icon: Factory },
   { href: '/demand-planning', label: 'Planejamento Demanda', icon: TrendingUp },
 ];
 
-export const PRODUCTION_ORDER_STATUSES: ProductionOrderStatus[] = ['Open', 'In Progress', 'Completed', 'Cancelled'];
+export const PRODUCTION_ORDER_STATUSES: ProductionOrderStatus[] = ['Aberta', 'Em Progresso', 'Concluída', 'Cancelada'];
 
-import type { ProductionOrderStatus } from '@/types';
 
-export const DUMMY_SKUS = [
-  { id: 'sku-1', code: 'SKU001', description: 'Produto Exemplo Alpha', createdAt: new Date().toISOString() },
-  { id: 'sku-2', code: 'SKU002', description: 'Produto Exemplo Beta', createdAt: new Date().toISOString() },
-  { id: 'sku-3', code: 'SKU003', description: 'Componente Gamma', createdAt: new Date().toISOString() },
+// Dados Fictícios (Dummy Data) para inicialização e testes
+const now = new Date();
+const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString();
+const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
+const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+
+export const DUMMY_SKUS_DATA: Omit<SKU, 'id' | 'createdAt'>[] = [
+  { code: 'SKU-CANAZ-G', description: 'Caneta Azul Gel Ponta Grossa'},
+  { code: 'SKU-CADBR-P', description: 'Caderno Brochura Capa Dura Pequeno'},
+  { code: 'SKU-LAPHB-U', description: 'Lápis HB Preto Unitário'},
+  { code: 'SKU-BORBR-M', description: 'Borracha Branca Macia Média'},
+  { code: 'SKU-RGU30-T', description: 'Régua 30cm Transparente Acrílico'},
 ];
 
-export const DUMMY_PRODUCTION_ORDERS = [
+export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'skuId'>[] = [
+  // Estes serão ligados aos SKUs por índice na inicialização do contexto
   { 
-    id: 'po-1', 
-    skuId: 'sku-1', 
     quantity: 100, 
-    status: 'Completed' as ProductionOrderStatus, 
-    startTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    endTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-    productionTime: 3600, // 1 hour in seconds
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() 
+    // skuId will be DUMMY_SKUS_DATA[0].id
+    // status: 'Concluída', // Definido no contexto
+    startTime: twoHoursAgo,
+    endTime: oneHourAgo,
+    productionTime: 3600, // 1 hora em segundos
+    notes: "Primeiro lote de canetas azuis."
   },
   { 
-    id: 'po-2', 
-    skuId: 'sku-2', 
     quantity: 50, 
-    status: 'In Progress' as ProductionOrderStatus, 
-    startTime: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 mins ago
-    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() 
+    // skuId will be DUMMY_SKUS_DATA[1].id
+    // status: 'Em Progresso', // Definido no contexto
+    startTime: thirtyMinAgo,
+    notes: "Produção de cadernos em andamento."
   },
   { 
-    id: 'po-3', 
-    skuId: 'sku-1', 
-    quantity: 200, 
-    status: 'Open' as ProductionOrderStatus, 
-    createdAt: new Date().toISOString() 
+    quantity: 200,
+    // skuId will be DUMMY_SKUS_DATA[0].id
+    // status: 'Aberta', // Definido no contexto
+    notes: "Pedido urgente de canetas."
   },
+  {
+    quantity: 150,
+    // skuId will be DUMMY_SKUS_DATA[2].id
+    // status: 'Aberta'
+  },
+  {
+    quantity: 75,
+    // skuId will be DUMMY_SKUS_DATA[3].id
+    // status: 'Concluída'
+    startTime: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
+    endTime: new Date(now.getTime() - 3 * 30 * 60 * 1000).toISOString(),
+    productionTime: 1800, // 30 minutos
+    notes: "Lote de borrachas finalizado."
+  }
 ];
 
-export const DUMMY_DEMANDS = [
-  { id: 'demand-1', skuId: 'sku-1', monthYear: '2024-07', targetQuantity: 500, createdAt: new Date().toISOString() },
-  { id: 'demand-2', skuId: 'sku-2', monthYear: '2024-07', targetQuantity: 250, createdAt: new Date().toISOString() },
-  { id: 'demand-3', skuId: 'sku-1', monthYear: '2024-08', targetQuantity: 600, createdAt: new Date().toISOString() },
+export const DUMMY_DEMANDS_DATA: Omit<Demand, 'id' | 'createdAt' | 'skuId'>[] = [
+  // Estes serão ligados aos SKUs por índice na inicialização do contexto
+  { monthYear: '2024-07', targetQuantity: 500 }, // skuId will be DUMMY_SKUS_DATA[0].id
+  { monthYear: '2024-07', targetQuantity: 250 }, // skuId will be DUMMY_SKUS_DATA[1].id
+  { monthYear: '2024-08', targetQuantity: 600 }, // skuId will be DUMMY_SKUS_DATA[0].id
+  { monthYear: '2024-08', targetQuantity: 300 }, // skuId will be DUMMY_SKUS_DATA[2].id
+  { monthYear: '2024-09', targetQuantity: 400 }, // skuId will be DUMMY_SKUS_DATA[1].id
 ];
+
+// Chaves para localStorage
+export const LOCAL_STORAGE_SKUS_KEY = 'pcpTrackerSkus';
+export const LOCAL_STORAGE_PRODUCTION_ORDERS_KEY = 'pcpTrackerProductionOrders';
+export const LOCAL_STORAGE_DEMANDS_KEY = 'pcpTrackerDemands';

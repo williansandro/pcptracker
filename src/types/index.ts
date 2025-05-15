@@ -2,32 +2,32 @@ export interface SKU {
   id: string;
   code: string;
   description: string;
-  createdAt: string;
+  createdAt: string; // ISO Date String
 }
 
-export type ProductionOrderStatus = 'Open' | 'In Progress' | 'Completed' | 'Cancelled';
+export type ProductionOrderStatus = 'Aberta' | 'Em Progresso' | 'Concluída' | 'Cancelada';
 
 export interface ProductionOrder {
   id: string;
-  skuId: string;
+  skuId: string; 
   quantity: number;
   status: ProductionOrderStatus;
-  startTime?: string;
-  endTime?: string;
-  productionTime?: number; // in seconds
+  startTime?: string; // ISO Date String
+  endTime?: string; // ISO Date String
+  productionTime?: number; // em segundos
   notes?: string;
-  createdAt: string;
+  createdAt: string; // ISO Date String
 }
 
 export interface Demand {
   id:string;
   skuId: string;
-  monthYear: string; // YYYY-MM format
+  monthYear: string; // Formato AAAA-MM (ex: "2024-07")
   targetQuantity: number;
-  createdAt: string;
+  createdAt: string; // ISO Date String
 }
 
-// For AI Analysis
+// Para Análise de IA
 export interface ProductionDataEntry {
   skuCode: string;
   quantityProduced: number;
