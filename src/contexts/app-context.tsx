@@ -1,3 +1,4 @@
+
 "use client";
 
 import type React from 'react';
@@ -48,24 +49,24 @@ const initializeDummyData = (): { skus: SKU[], productionOrders: ProductionOrder
   }));
 
   const initialProductionOrders: ProductionOrder[] = DUMMY_PRODUCTION_ORDERS_DATA.map((poData, index) => {
-    let status: ProductionOrderStatus = 'Aberta';
-    if (index === 0) status = 'Concluída';
-    else if (index === 1) status = 'Em Progresso';
-    else if (index === 4) status = 'Concluída';
+    let status: ProductionOrderStatus = 'Aberta'; // Traduzido
+    if (index === 0) status = 'Concluída'; // Traduzido
+    else if (index === 1) status = 'Em Progresso'; // Traduzido
+    else if (index === 4) status = 'Concluída'; // Traduzido
 
     return {
       ...poData,
       id: uuidv4(),
-      skuId: initialSkus[index % initialSkus.length].id, // Garante que o skuId existe
+      skuId: initialSkus[index % initialSkus.length].id, 
       status,
-      createdAt: new Date(Date.now() - (DUMMY_PRODUCTION_ORDERS_DATA.length - index) * 10 * 60 * 1000).toISOString(), // Datas de criação escalonadas
+      createdAt: new Date(Date.now() - (DUMMY_PRODUCTION_ORDERS_DATA.length - index) * 10 * 60 * 1000).toISOString(), 
     };
   });
   
   const initialDemands: Demand[] = DUMMY_DEMANDS_DATA.map((demandData, index) => ({
     ...demandData,
     id: uuidv4(),
-    skuId: initialSkus[index % initialSkus.length].id, // Garante que o skuId existe
+    skuId: initialSkus[index % initialSkus.length].id, 
     createdAt: new Date().toISOString(),
   }));
 
@@ -94,6 +95,7 @@ interface AppContextType {
   updateDemand: (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => void;
   deleteDemand: (demandId: string) => void;
   findDemandBySkuAndMonth: (skuId: string, monthYear: string) => Demand | undefined;
+  isDataReady: boolean; // Para indicar quando os dados estão prontos no cliente
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -102,46 +104,44 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [skus, setSkus] = useState<SKU[]>(() => loadFromLocalStorage(LOCAL_STORAGE_SKUS_KEY, []));
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>(() => loadFromLocalStorage(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY, []));
   const [demands, setDemands] = useState<Demand[]>(() => loadFromLocalStorage(LOCAL_STORAGE_DEMANDS_KEY, []));
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // Se o localStorage estiver vazio na primeira carga, inicialize com dados fictícios
-    if (typeof window !== 'undefined') {
-      const storedSkus = window.localStorage.getItem(LOCAL_STORAGE_SKUS_KEY);
-      if (!storedSkus || JSON.parse(storedSkus).length === 0) {
-        const { skus: initialSkus, productionOrders: initialPOs, demands: initialDemands } = initializeDummyData();
-        setSkus(initialSkus);
-        setProductionOrders(initialPOs);
-        setDemands(initialDemands);
-        saveToLocalStorage(LOCAL_STORAGE_SKUS_KEY, initialSkus);
-        saveToLocalStorage(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY, initialPOs);
-        saveToLocalStorage(LOCAL_STORAGE_DEMANDS_KEY, initialDemands);
-      }
-      setIsInitialLoad(false);
+    setIsMounted(true); // Indica que o componente foi montado no cliente
+
+    // A lógica de inicialização de dados dummy só deve rodar no cliente
+    // e se o localStorage estiver realmente vazio.
+    const storedSkus = window.localStorage.getItem(LOCAL_STORAGE_SKUS_KEY);
+    if (!storedSkus || JSON.parse(storedSkus).length === 0) {
+      const { skus: initialSkus, productionOrders: initialPOs, demands: initialDemands } = initializeDummyData();
+      setSkus(initialSkus);
+      setProductionOrders(initialPOs);
+      setDemands(initialDemands);
+      // Salva os dados dummy imediatamente no localStorage
+      saveToLocalStorage(LOCAL_STORAGE_SKUS_KEY, initialSkus);
+      saveToLocalStorage(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY, initialPOs);
+      saveToLocalStorage(LOCAL_STORAGE_DEMANDS_KEY, initialDemands);
     }
   }, []);
 
 
-  // Salvar SKUs no localStorage sempre que mudarem (exceto na carga inicial, se já existiam)
   useEffect(() => {
-    if (!isInitialLoad) {
+    if (isMounted) { // Só salva no localStorage se estiver montado no cliente
       saveToLocalStorage(LOCAL_STORAGE_SKUS_KEY, skus);
     }
-  }, [skus, isInitialLoad]);
+  }, [skus, isMounted]);
 
-  // Salvar Ordens de Produção no localStorage
   useEffect(() => {
-    if (!isInitialLoad) {
+    if (isMounted) {
       saveToLocalStorage(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY, productionOrders);
     }
-  }, [productionOrders, isInitialLoad]);
+  }, [productionOrders, isMounted]);
 
-  // Salvar Demandas no localStorage
   useEffect(() => {
-    if (!isInitialLoad) {
+    if (isMounted) {
       saveToLocalStorage(LOCAL_STORAGE_DEMANDS_KEY, demands);
     }
-  }, [demands, isInitialLoad]);
+  }, [demands, isMounted]);
 
   // Gerenciamento de SKU
   const addSku = useCallback((skuData: Omit<SKU, 'id' | 'createdAt'>) => {
@@ -155,7 +155,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteSku = useCallback((skuId: string) => {
     setSkus(prev => prev.filter(s => s.id !== skuId));
-    // Opcional: lidar com exclusões em cascata ou avisos para OPs/Demandas relacionadas
   }, []);
   
   const findSkuById = useCallback((skuId: string) => skus.find(s => s.id === skuId), [skus]);
@@ -165,7 +164,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const newPo: ProductionOrder = { 
       ...poData, 
       id: uuidv4(), 
-      status: 'Aberta', 
+      status: 'Aberta', // Traduzido
       createdAt: new Date().toISOString() 
     };
     setProductionOrders(prev => [...prev, newPo]);
@@ -181,16 +180,16 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const startProductionOrderTimer = useCallback((poId: string) => {
     setProductionOrders(prev => prev.map(po => 
-      po.id === poId && po.status === 'Aberta' ? { ...po, status: 'Em Progresso', startTime: new Date().toISOString(), endTime: undefined, productionTime: undefined } : po
+      po.id === poId && po.status === 'Aberta' ? { ...po, status: 'Em Progresso', startTime: new Date().toISOString(), endTime: undefined, productionTime: undefined } : po // Traduzido
     ));
   }, []);
 
   const stopProductionOrderTimer = useCallback((poId: string) => {
     setProductionOrders(prev => prev.map(po => {
-      if (po.id === poId && po.status === 'Em Progresso' && po.startTime) {
+      if (po.id === poId && po.status === 'Em Progresso' && po.startTime) { // Traduzido
         const endTime = new Date();
-        const productionTime = Math.floor((endTime.getTime() - new Date(po.startTime).getTime()) / 1000); // Em segundos
-        return { ...po, status: 'Concluída', endTime: endTime.toISOString(), productionTime };
+        const productionTime = Math.floor((endTime.getTime() - new Date(po.startTime).getTime()) / 1000); 
+        return { ...po, status: 'Concluída', endTime: endTime.toISOString(), productionTime }; // Traduzido
       }
       return po;
     }));
@@ -219,10 +218,31 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [demands]);
 
   const contextValue = useMemo(() => ({
-    skus, addSku, updateSku, deleteSku, findSkuById,
-    productionOrders, addProductionOrder, updateProductionOrder, deleteProductionOrder, startProductionOrderTimer, stopProductionOrderTimer, findProductionOrderById, getProductionOrdersBySku,
-    demands, addDemand, updateDemand, deleteDemand, findDemandBySkuAndMonth,
-  }), [skus, productionOrders, demands, findSkuById, getProductionOrdersBySku, findProductionOrderById, findDemandBySkuAndMonth, addSku, updateSku, deleteSku, addProductionOrder, updateProductionOrder, deleteProductionOrder, startProductionOrderTimer, stopProductionOrderTimer, addDemand, updateDemand, deleteDemand]);
+    skus: isMounted ? skus : [],
+    addSku, 
+    updateSku, 
+    deleteSku, 
+    findSkuById,
+    productionOrders: isMounted ? productionOrders : [],
+    addProductionOrder, 
+    updateProductionOrder, 
+    deleteProductionOrder, 
+    startProductionOrderTimer, 
+    stopProductionOrderTimer, 
+    findProductionOrderById, 
+    getProductionOrdersBySku,
+    demands: isMounted ? demands : [],
+    addDemand, 
+    updateDemand, 
+    deleteDemand, 
+    findDemandBySkuAndMonth,
+    isDataReady: isMounted,
+  }), [
+    isMounted, skus, productionOrders, demands, 
+    addSku, updateSku, deleteSku, findSkuById,
+    addProductionOrder, updateProductionOrder, deleteProductionOrder, startProductionOrderTimer, stopProductionOrderTimer, findProductionOrderById, getProductionOrdersBySku,
+    addDemand, updateDemand, deleteDemand, findDemandBySkuAndMonth
+  ]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
@@ -234,3 +254,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
