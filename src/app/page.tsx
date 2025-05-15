@@ -107,10 +107,10 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" />
-        <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description="Ordens pendentes ou em execução" />
-        <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description="Ordens de produção finalizadas" />
-        <MetricCard title="Tempo Médio de Produção" value={avgProductionTime} icon={Clock3} description="Tempo médio por ordem concluída" />
+        <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" className="metric-card-purple" />
+        <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description="Ordens pendentes ou em execução" className="metric-card-blue"/>
+        <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description="Ordens de produção finalizadas" className="metric-card-orange"/>
+        <MetricCard title="Tempo Médio de Produção" value={avgProductionTime} icon={Clock3} description="Tempo médio por ordem concluída" className="metric-card-teal"/>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

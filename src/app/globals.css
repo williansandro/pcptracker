@@ -125,4 +125,33 @@
     @apply bg-blue-500; /* Tailwind blue, can be changed to theme accent if preferred */
     /* For Berry blue accent: @apply bg-accent; */
   }
+
+  /* Colored Metric Cards */
+  .metric-card-purple {
+    @apply bg-primary text-primary-foreground;
+  }
+  .metric-card-purple .text-muted-foreground {
+    @apply text-primary-foreground/80;
+  }
+
+  .metric-card-blue {
+    @apply bg-accent text-accent-foreground;
+  }
+  .metric-card-blue .text-muted-foreground {
+    @apply text-accent-foreground/80;
+  }
+
+  .metric-card-orange {
+    @apply bg-orange-500 text-white;
+  }
+  .metric-card-orange .text-muted-foreground {
+    @apply text-white/80;
+  }
+
+  .metric-card-teal {
+    @apply bg-teal-600 text-white;
+  }
+  .metric-card-teal .text-muted-foreground {
+    @apply text-white/80;
+  }
 }
