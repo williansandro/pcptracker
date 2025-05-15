@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ClientSideDateTime } from "@/components/client-side-date-time";
 import { ptBR } from 'date-fns/locale';
+import { cn } from "@/lib/utils";
 
 export const getDemandColumns = (
   findSkuById: (skuId: string) => SKU | undefined,
@@ -81,7 +82,7 @@ export const getDemandColumns = (
         const productionOrders = getProductionOrdersBySku(demand.skuId);
         const producedInMonth = productionOrders
           .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear) && typeof po.producedQuantity === 'number')
-          .reduce((sum, po) => sum + po.producedQuantity!, 0); // Usar producedQuantity
+          .reduce((sum, po) => sum + po.producedQuantity!, 0);
         return producedInMonth.toLocaleString('pt-BR');
       },
     },
@@ -93,16 +94,34 @@ export const getDemandColumns = (
         const productionOrders = getProductionOrdersBySku(demand.skuId);
         const producedInMonth = productionOrders
           .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear) && typeof po.producedQuantity === 'number')
-          .reduce((sum, po) => sum + po.producedQuantity!, 0); // Usar producedQuantity
+          .reduce((sum, po) => sum + po.producedQuantity!, 0);
 
         const targetQuantity = typeof demand.targetQuantity === 'number' ? demand.targetQuantity : 0;
         const progressPercentage = targetQuantity > 0
-          ? Math.min(Math.round((producedInMonth / targetQuantity) * 100), 100)
+          ? Math.round((producedInMonth / targetQuantity) * 100)
           : 0;
+
+        let progressBarClass = "";
+        let textColorClass = "";
+
+        if (progressPercentage > 100) {
+          progressBarClass = "progress-bar-blue";
+          textColorClass = "text-blue-600";
+        } else if (progressPercentage >= 90) {
+          progressBarClass = "progress-bar-green";
+          textColorClass = "text-green-600";
+        } else if (progressPercentage >= 70) {
+          progressBarClass = "progress-bar-yellow";
+          textColorClass = "text-yellow-600";
+        } else {
+          progressBarClass = "progress-bar-red";
+          textColorClass = "text-red-600";
+        }
+        
         return (
-          <div className="flex items-center">
-            <Progress value={progressPercentage} className="w-[80px] h-3 mr-2" />
-            <span>{progressPercentage}%</span>
+          <div className="flex items-center w-28">
+            <Progress value={Math.min(progressPercentage, 100)} className={cn("h-3 mr-2", progressBarClass)} />
+            <span className={cn("text-xs font-semibold", textColorClass)}>{progressPercentage}%</span>
           </div>
         );
       },
@@ -113,3 +132,4 @@ export const getDemandColumns = (
     },
   ];
 };
+
