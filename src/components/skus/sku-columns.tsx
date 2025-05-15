@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
@@ -6,7 +7,8 @@ import { SkuActions } from "./sku-actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format } from 'date-fns';
+// Removed: import { format } from 'date-fns';
+import { ClientSideDateTime } from "@/components/client-side-date-time";
 
 export const skuColumns: ColumnDef<SKU>[] = [
   {
@@ -65,8 +67,8 @@ export const skuColumns: ColumnDef<SKU>[] = [
       )
     },
     cell: ({ row }) => {
-      const date = new Date(row.getValue("createdAt"));
-      return <div>{format(date, "dd/MM/yyyy HH:mm")}</div>;
+      const dateString = row.getValue("createdAt") as string;
+      return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" /></div>;
     },
   },
   {

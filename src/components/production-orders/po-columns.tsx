@@ -9,13 +9,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format } from 'date-fns';
-// Removed: import { useAppContext } from "@/contexts/app-context";
+// Removed: import { format } from 'date-fns'; 
+import { ClientSideDateTime } from "@/components/client-side-date-time";
 
 
 export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): ColumnDef<ProductionOrder>[] => {
-  // Removed: const { findSkuById } = useAppContext(); 
-
   return [
     {
       id: "select",
@@ -67,8 +65,8 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         let variant: "default" | "secondary" | "destructive" | "outline" = "default";
-        if (status === "Completed") variant = "default"; // Default is primary which is blue
-        else if (status === "In Progress") variant = "outline"; // Outline will use accent (teal)
+        if (status === "Completed") variant = "default"; 
+        else if (status === "In Progress") variant = "outline"; 
         else if (status === "Open") variant = "secondary";
         else if (status === "Cancelled") variant = "destructive";
         
@@ -94,8 +92,8 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.getValue("createdAt"));
-        return <div>{format(date, "dd/MM/yyyy HH:mm")}</div>;
+        const dateString = row.getValue("createdAt") as string;
+        return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" /></div>;
       },
     },
     {
