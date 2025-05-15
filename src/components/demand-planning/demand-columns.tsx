@@ -68,7 +68,10 @@ export const getDemandColumns = (
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => (row.getValue("targetQuantity") as number).toLocaleString('pt-BR'),
+      cell: ({ row }) => {
+        const value = row.getValue("targetQuantity");
+        return typeof value === 'number' ? value.toLocaleString('pt-BR') : "-";
+      },
     },
     {
       id: "producedQuantity",
@@ -92,8 +95,9 @@ export const getDemandColumns = (
           .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear) && typeof po.producedQuantity === 'number')
           .reduce((sum, po) => sum + po.producedQuantity!, 0); // Usar producedQuantity
 
-        const progressPercentage = demand.targetQuantity > 0
-          ? Math.min(Math.round((producedInMonth / demand.targetQuantity) * 100), 100)
+        const targetQuantity = typeof demand.targetQuantity === 'number' ? demand.targetQuantity : 0;
+        const progressPercentage = targetQuantity > 0
+          ? Math.min(Math.round((producedInMonth / targetQuantity) * 100), 100)
           : 0;
         return (
           <div className="flex items-center">

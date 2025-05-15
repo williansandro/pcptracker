@@ -55,7 +55,10 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => (row.getValue("targetQuantity") as number).toLocaleString('pt-BR'),
+      cell: ({ row }) => {
+        const value = row.getValue("targetQuantity");
+        return typeof value === 'number' ? value.toLocaleString('pt-BR') : "-";
+      },
     },
     {
       accessorKey: "producedQuantity",
