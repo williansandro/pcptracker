@@ -1,3 +1,4 @@
+
 // 'use server';
 
 /**
@@ -26,12 +27,12 @@ const ImproveProductionTimesOutputSchema = z.object({
   analysis: z
     .string()
     .describe(
-      'An analysis of the production data, identifying bottlenecks and areas for improvement.'
+      'Uma análise dos dados de produção, identificando gargalos e áreas para melhoria. A resposta deve ser em Português do Brasil.'
     ),
   suggestions: z
     .string()
     .describe(
-      'Specific, actionable suggestions for optimizing manufacturing processes and reducing overall production time.'
+      'Sugestões específicas e acionáveis para otimizar os processos de fabricação e reduzir o tempo total de produção. A resposta deve ser em Português do Brasil.'
     ),
 });
 export type ImproveProductionTimesOutput = z.infer<typeof ImproveProductionTimesOutputSchema>;
@@ -46,14 +47,16 @@ const prompt = ai.definePrompt({
   name: 'improveProductionTimesPrompt',
   input: {schema: ImproveProductionTimesInputSchema},
   output: {schema: ImproveProductionTimesOutputSchema},
-  prompt: `You are a manufacturing efficiency expert. Analyze the following production data to identify bottlenecks and suggest improvements.
+  prompt: `Você é um especialista em eficiência de manufatura. Analise os seguintes dados de produção para identificar gargalos e sugerir melhorias.
 
-Production Data:
+Dados de Produção:
 {{{productionData}}}
 
-Provide an analysis of the data and specific, actionable suggestions for optimizing manufacturing processes and reducing overall production time.
+Forneça uma análise dos dados e sugestões específicas e acionáveis para otimizar os processos de fabricação e reduzir o tempo total de produção.
 
-Output your response in the following JSON format:
+Sua resposta DEVE ser em Português do Brasil.
+
+Formate sua resposta no seguinte formato JSON:
 {
   "analysis": "...",
   "suggestions": "..."
@@ -71,3 +74,4 @@ const improveProductionTimesFlow = ai.defineFlow(
     return output!;
   }
 );
+
