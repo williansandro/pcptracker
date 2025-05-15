@@ -4,14 +4,13 @@
 import type React from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import type { SKU, ProductionOrder, Demand, ProductionOrderStatus } from '@/types';
-import { 
-  DUMMY_SKUS_DATA, 
-  DUMMY_PRODUCTION_ORDERS_DATA, 
+import {
+  DUMMY_SKUS_DATA,
+  DUMMY_PRODUCTION_ORDERS_DATA,
   DUMMY_DEMANDS_DATA,
   LOCAL_STORAGE_SKUS_KEY,
   LOCAL_STORAGE_PRODUCTION_ORDERS_KEY,
   LOCAL_STORAGE_DEMANDS_KEY,
-  PRODUCTION_ORDER_STATUSES
 } from '@/lib/constants';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -49,24 +48,29 @@ const initializeDummyData = (): { skus: SKU[], productionOrders: ProductionOrder
   }));
 
   const initialProductionOrders: ProductionOrder[] = DUMMY_PRODUCTION_ORDERS_DATA.map((poData, index) => {
-    let status: ProductionOrderStatus = 'Aberta'; // Traduzido
-    if (index === 0) status = 'Concluída'; // Traduzido
-    else if (index === 1) status = 'Em Progresso'; // Traduzido
-    else if (index === 4) status = 'Concluída'; // Traduzido
+    let status: ProductionOrderStatus = 'Aberta';
+    if (index === 0) status = 'Concluída';
+    else if (index === 1) status = 'Em Progresso';
+    else if (index === 4) status = 'Concluída';
 
     return {
-      ...poData,
       id: uuidv4(),
-      skuId: initialSkus[index % initialSkus.length].id, 
+      skuId: initialSkus[index % initialSkus.length].id,
+      targetQuantity: poData.targetQuantity,
+      producedQuantity: status === 'Concluída' ? poData.producedQuantity : undefined,
       status,
-      createdAt: new Date(Date.now() - (DUMMY_PRODUCTION_ORDERS_DATA.length - index) * 10 * 60 * 1000).toISOString(), 
+      startTime: poData.startTime,
+      endTime: status === 'Concluída' ? poData.endTime : undefined,
+      productionTime: status === 'Concluída' ? poData.productionTime : undefined,
+      notes: poData.notes,
+      createdAt: new Date(Date.now() - (DUMMY_PRODUCTION_ORDERS_DATA.length - index) * 10 * 60 * 1000).toISOString(),
     };
   });
-  
+
   const initialDemands: Demand[] = DUMMY_DEMANDS_DATA.map((demandData, index) => ({
     ...demandData,
     id: uuidv4(),
-    skuId: initialSkus[index % initialSkus.length].id, 
+    skuId: initialSkus[index % initialSkus.length].id,
     createdAt: new Date().toISOString(),
   }));
 
@@ -82,11 +86,11 @@ interface AppContextType {
   findSkuById: (skuId: string) => SKU | undefined;
 
   productionOrders: ProductionOrder[];
-  addProductionOrder: (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status'>) => void;
+  addProductionOrder: (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity'>) => void;
   updateProductionOrder: (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => void;
   deleteProductionOrder: (poId: string) => void;
   startProductionOrderTimer: (poId: string) => void;
-  stopProductionOrderTimer: (poId: string) => void;
+  stopProductionOrderTimer: (poId: string, producedQuantity: number) => void;
   findProductionOrderById: (poId: string) => ProductionOrder | undefined;
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[];
 
@@ -95,38 +99,43 @@ interface AppContextType {
   updateDemand: (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => void;
   deleteDemand: (demandId: string) => void;
   findDemandBySkuAndMonth: (skuId: string, monthYear: string) => Demand | undefined;
-  isDataReady: boolean; // Para indicar quando os dados estão prontos no cliente
+  isDataReady: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [skus, setSkus] = useState<SKU[]>(() => loadFromLocalStorage(LOCAL_STORAGE_SKUS_KEY, []));
-  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>(() => loadFromLocalStorage(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY, []));
-  const [demands, setDemands] = useState<Demand[]>(() => loadFromLocalStorage(LOCAL_STORAGE_DEMANDS_KEY, []));
+  const [skus, setSkus] = useState<SKU[]>([]);
+  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
+  const [demands, setDemands] = useState<Demand[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true); // Indica que o componente foi montado no cliente
-
-    // A lógica de inicialização de dados dummy só deve rodar no cliente
-    // e se o localStorage estiver realmente vazio.
+    setIsMounted(true);
     const storedSkus = window.localStorage.getItem(LOCAL_STORAGE_SKUS_KEY);
-    if (!storedSkus || JSON.parse(storedSkus).length === 0) {
+    const storedPOs = window.localStorage.getItem(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY);
+    const storedDemands = window.localStorage.getItem(LOCAL_STORAGE_DEMANDS_KEY);
+
+    if (!storedSkus || JSON.parse(storedSkus).length === 0 ||
+        !storedPOs || JSON.parse(storedPOs).length === 0 ||
+        !storedDemands || JSON.parse(storedDemands).length === 0) {
       const { skus: initialSkus, productionOrders: initialPOs, demands: initialDemands } = initializeDummyData();
       setSkus(initialSkus);
       setProductionOrders(initialPOs);
       setDemands(initialDemands);
-      // Salva os dados dummy imediatamente no localStorage
       saveToLocalStorage(LOCAL_STORAGE_SKUS_KEY, initialSkus);
       saveToLocalStorage(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY, initialPOs);
       saveToLocalStorage(LOCAL_STORAGE_DEMANDS_KEY, initialDemands);
+    } else {
+      setSkus(loadFromLocalStorage(LOCAL_STORAGE_SKUS_KEY, []));
+      setProductionOrders(loadFromLocalStorage(LOCAL_STORAGE_PRODUCTION_ORDERS_KEY, []));
+      setDemands(loadFromLocalStorage(LOCAL_STORAGE_DEMANDS_KEY, []));
     }
   }, []);
 
 
   useEffect(() => {
-    if (isMounted) { // Só salva no localStorage se estiver montado no cliente
+    if (isMounted) {
       saveToLocalStorage(LOCAL_STORAGE_SKUS_KEY, skus);
     }
   }, [skus, isMounted]);
@@ -155,17 +164,19 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteSku = useCallback((skuId: string) => {
     setSkus(prev => prev.filter(s => s.id !== skuId));
+    setProductionOrders(prev => prev.filter(po => po.skuId !== skuId));
+    setDemands(prev => prev.filter(d => d.skuId !== skuId));
   }, []);
-  
+
   const findSkuById = useCallback((skuId: string) => skus.find(s => s.id === skuId), [skus]);
 
   // Gerenciamento de Ordem de Produção
-  const addProductionOrder = useCallback((poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status'>) => {
-    const newPo: ProductionOrder = { 
-      ...poData, 
-      id: uuidv4(), 
-      status: 'Aberta', // Traduzido
-      createdAt: new Date().toISOString() 
+  const addProductionOrder = useCallback((poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity'>) => {
+    const newPo: ProductionOrder = {
+      ...poData,
+      id: uuidv4(),
+      status: 'Aberta',
+      createdAt: new Date().toISOString()
     };
     setProductionOrders(prev => [...prev, newPo]);
   }, []);
@@ -179,17 +190,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const startProductionOrderTimer = useCallback((poId: string) => {
-    setProductionOrders(prev => prev.map(po => 
-      po.id === poId && po.status === 'Aberta' ? { ...po, status: 'Em Progresso', startTime: new Date().toISOString(), endTime: undefined, productionTime: undefined } : po // Traduzido
+    setProductionOrders(prev => prev.map(po =>
+      po.id === poId && po.status === 'Aberta' ? { ...po, status: 'Em Progresso', startTime: new Date().toISOString(), endTime: undefined, productionTime: undefined } : po
     ));
   }, []);
 
-  const stopProductionOrderTimer = useCallback((poId: string) => {
+  const stopProductionOrderTimer = useCallback((poId: string, producedQuantity: number) => {
     setProductionOrders(prev => prev.map(po => {
-      if (po.id === poId && po.status === 'Em Progresso' && po.startTime) { // Traduzido
+      if (po.id === poId && po.status === 'Em Progresso' && po.startTime) {
         const endTime = new Date();
-        const productionTime = Math.floor((endTime.getTime() - new Date(po.startTime).getTime()) / 1000); 
-        return { ...po, status: 'Concluída', endTime: endTime.toISOString(), productionTime }; // Traduzido
+        const productionTime = Math.floor((endTime.getTime() - new Date(po.startTime).getTime()) / 1000);
+        return { ...po, status: 'Concluída', endTime: endTime.toISOString(), productionTime, producedQuantity };
       }
       return po;
     }));
@@ -219,26 +230,26 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const contextValue = useMemo(() => ({
     skus: isMounted ? skus : [],
-    addSku, 
-    updateSku, 
-    deleteSku, 
+    addSku,
+    updateSku,
+    deleteSku,
     findSkuById,
     productionOrders: isMounted ? productionOrders : [],
-    addProductionOrder, 
-    updateProductionOrder, 
-    deleteProductionOrder, 
-    startProductionOrderTimer, 
-    stopProductionOrderTimer, 
-    findProductionOrderById, 
+    addProductionOrder,
+    updateProductionOrder,
+    deleteProductionOrder,
+    startProductionOrderTimer,
+    stopProductionOrderTimer,
+    findProductionOrderById,
     getProductionOrdersBySku,
     demands: isMounted ? demands : [],
-    addDemand, 
-    updateDemand, 
-    deleteDemand, 
+    addDemand,
+    updateDemand,
+    deleteDemand,
     findDemandBySkuAndMonth,
     isDataReady: isMounted,
   }), [
-    isMounted, skus, productionOrders, demands, 
+    isMounted, skus, productionOrders, demands,
     addSku, updateSku, deleteSku, findSkuById,
     addProductionOrder, updateProductionOrder, deleteProductionOrder, startProductionOrderTimer, stopProductionOrderTimer, findProductionOrderById, getProductionOrdersBySku,
     addDemand, updateDemand, deleteDemand, findDemandBySkuAndMonth
@@ -254,4 +265,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

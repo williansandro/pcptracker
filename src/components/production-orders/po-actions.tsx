@@ -1,6 +1,7 @@
+
 "use client";
 
-import { MoreHorizontal, Edit, Trash2, PlayCircle, PauseCircle, CheckCircle2, XCircle } from "lucide-react"; // Adicionado XCircle para Cancelar
+import { MoreHorizontal, Edit, Trash2, PlayCircle, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PoFormDialog } from "./po-form-dialog";
+import { CompletePoDialog } from "./complete-po-dialog"; // Importar o novo diálogo
 import type { ProductionOrder, SKU } from "@/types";
 import { useAppContext } from "@/contexts/app-context";
 import { useToast } from "@/hooks/use-toast";
@@ -34,10 +36,10 @@ interface PoActionsProps {
 }
 
 export function PoActions({ productionOrder }: PoActionsProps) {
-  const { 
-    deleteProductionOrder, 
-    startProductionOrderTimer, 
-    stopProductionOrderTimer,
+  const {
+    deleteProductionOrder,
+    startProductionOrderTimer,
+    // stopProductionOrderTimer, // Não é mais chamado diretamente daqui
     updateProductionOrder,
     getProductionOrdersBySku,
     findSkuById,
@@ -59,11 +61,6 @@ export function PoActions({ productionOrder }: PoActionsProps) {
     toast({ title: "Produção Iniciada", description: `Timer iniciado para OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}).` });
   };
 
-  const handleStopTimer = () => {
-    stopProductionOrderTimer(productionOrder.id);
-    toast({ title: "Produção Concluída", description: `Timer finalizado para OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}).` });
-  };
-  
   const handleCancelOrder = () => {
     updateProductionOrder(productionOrder.id, { status: 'Cancelada' });
     toast({ title: "Ordem Cancelada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) foi cancelada.` });
@@ -79,9 +76,8 @@ export function PoActions({ productionOrder }: PoActionsProps) {
         </Button>
       )}
       {productionOrder.status === 'Em Progresso' && (
-        <Button variant="ghost" size="icon" onClick={handleStopTimer} title="Finalizar Produção">
-          <CheckCircle2 className="h-5 w-5 text-blue-600" />
-        </Button>
+        // O CompletePoDialog agora lida com o botão de trigger
+        <CompletePoDialog productionOrder={productionOrder} />
       )}
 
       <AlertDialog>
@@ -98,14 +94,13 @@ export function PoActions({ productionOrder }: PoActionsProps) {
             <PoFormDialog
               productionOrder={productionOrder}
               trigger={
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={productionOrder.status === 'Concluída' || productionOrder.status === 'Cancelada'}>
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={productionOrder.status === 'Cancelada'}>
                   <Edit className="mr-2 h-4 w-4" /> Editar
                 </DropdownMenuItem>
               }
             />
             {sku && completedOrdersForSku.length > 0 && (
                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                 {/* A DialogTrigger está dentro do AiAnalysisDialog agora */}
                  <AiAnalysisDialog productionOrdersForSku={completedOrdersForSku} sku={sku}/>
                </DropdownMenuItem>
             )}

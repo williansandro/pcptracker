@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,7 +8,7 @@
     --background: 240 10% 97%; /* Lighter gray for a softer background */
     --foreground: 235 10% 20%; /* Darker text for better contrast */
 
-    --muted: 240 5% 90%; 
+    --muted: 240 5% 90%;
     --muted-foreground: 240 5% 45%;
 
     --popover: 0 0% 100%;
@@ -36,7 +37,7 @@
 
     --chart-1: 235 62% 50%; /* Primary related */
     --chart-2: 188 100% 45%; /* Accent related */
-    --chart-3: 210 50% 60%; 
+    --chart-3: 210 50% 60%;
     --chart-4: 30 80% 65%;
     --chart-5: 120 40% 55%;
 
@@ -86,7 +87,7 @@
     --chart-3: 210 50% 70%;
     --chart-4: 30 80% 75%;
     --chart-5: 120 40% 65%;
-    
+
     --sidebar-background: 235 20% 10%; /* Darker for sidebar */
     --sidebar-foreground: 0 0% 90%;
     --sidebar-primary: 235 62% 55%;
@@ -104,7 +105,21 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Removed explicit font-family: Arial, Helvetica, sans-serif; */
-    /* Font will be handled by Next.js font setup in layout.tsx and tailwind.config.ts */
+  }
+}
+
+/* Custom Progress Bar Colors */
+@layer components {
+  .progress-bar-red > div {
+    @apply bg-red-500;
+  }
+  .progress-bar-yellow > div {
+    @apply bg-yellow-500;
+  }
+  .progress-bar-green > div {
+    @apply bg-green-500;
+  }
+  .progress-bar-blue > div {
+    @apply bg-blue-500;
   }
 }

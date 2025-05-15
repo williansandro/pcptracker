@@ -1,3 +1,4 @@
+
 export interface SKU {
   id: string;
   code: string;
@@ -9,8 +10,9 @@ export type ProductionOrderStatus = 'Aberta' | 'Em Progresso' | 'Concluída' | '
 
 export interface ProductionOrder {
   id: string;
-  skuId: string; 
-  quantity: number;
+  skuId: string;
+  targetQuantity: number; // Renomeado de quantity
+  producedQuantity?: number; // Nova propriedade
   status: ProductionOrderStatus;
   startTime?: string; // ISO Date String
   endTime?: string; // ISO Date String
@@ -30,6 +32,6 @@ export interface Demand {
 // Para Análise de IA
 export interface ProductionDataEntry {
   skuCode: string;
-  quantityProduced: number;
+  quantityProduced: number; // Mantido como quantityProduced para o input da IA
   productionTimeMinutes: number;
 }

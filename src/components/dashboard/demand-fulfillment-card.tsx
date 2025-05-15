@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAppContext } from '@/contexts/app-context';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Target } from 'lucide-react';
 import { useMemo } from 'react';
-import { format, getMonth, getYear } from 'date-fns';
+import { format } from 'date-fns'; // getMonth, getYear removidos pois format(date, 'yyyy-MM') é mais direto
 
 export function DemandFulfillmentCard() {
   const { demands, productionOrders } = useAppContext();
@@ -24,11 +25,11 @@ export function DemandFulfillmentCard() {
     let totalProduced = 0;
     currentMonthDemands.forEach(demand => {
       const completedPOsForSku = productionOrders.filter(
-        po => po.skuId === demand.skuId && po.status === 'Concluída' && po.endTime?.startsWith(currentMonthYear)
+        po => po.skuId === demand.skuId && po.status === 'Concluída' && po.endTime?.startsWith(currentMonthYear) && typeof po.producedQuantity === 'number'
       );
-      totalProduced += completedPOsForSku.reduce((sum, po) => sum + po.quantity, 0);
+      totalProduced += completedPOsForSku.reduce((sum, po) => sum + po.producedQuantity!, 0); // Usar producedQuantity
     });
-    
+
     const percentage = totalTarget > 0 ? Math.min(Math.round((totalProduced / totalTarget) * 100), 100) : 0;
 
     return { totalTarget, totalProduced, percentage };

@@ -1,5 +1,6 @@
+
 import type { NavItem } from '@/components/layout/main-nav';
-import { LayoutDashboard, Package, Factory, TrendingUp } from 'lucide-react'; // Removido Settings, pois não há página de settings
+import { LayoutDashboard, Package, Factory, TrendingUp } from 'lucide-react';
 import type { SKU, ProductionOrder, Demand, ProductionOrderStatus } from '@/types';
 
 export const APP_NAME = "PCP Tracker"; // PCP: Planejamento e Controle da Produção
@@ -18,7 +19,6 @@ export const PRODUCTION_ORDER_STATUSES: ProductionOrderStatus[] = ['Aberta', 'Em
 const now = new Date();
 const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString();
 const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
-const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
 const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
 
 export const DUMMY_SKUS_DATA: Omit<SKU, 'id' | 'createdAt'>[] = [
@@ -30,52 +30,43 @@ export const DUMMY_SKUS_DATA: Omit<SKU, 'id' | 'createdAt'>[] = [
 ];
 
 export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'skuId'>[] = [
-  // Estes serão ligados aos SKUs por índice na inicialização do contexto
-  { 
-    quantity: 100, 
-    // skuId will be DUMMY_SKUS_DATA[0].id
-    // status: 'Concluída', // Definido no contexto
+  {
+    targetQuantity: 100,
+    producedQuantity: 95, // Exemplo: produziu um pouco menos
     startTime: twoHoursAgo,
     endTime: oneHourAgo,
-    productionTime: 3600, // 1 hora em segundos
+    productionTime: 3600,
     notes: "Primeiro lote de canetas azuis."
   },
-  { 
-    quantity: 50, 
-    // skuId will be DUMMY_SKUS_DATA[1].id
-    // status: 'Em Progresso', // Definido no contexto
+  {
+    targetQuantity: 50,
+    // producedQuantity será definido quando for concluída
     startTime: thirtyMinAgo,
     notes: "Produção de cadernos em andamento."
   },
-  { 
-    quantity: 200,
-    // skuId will be DUMMY_SKUS_DATA[0].id
-    // status: 'Aberta', // Definido no contexto
+  {
+    targetQuantity: 200,
     notes: "Pedido urgente de canetas."
   },
   {
-    quantity: 150,
-    // skuId will be DUMMY_SKUS_DATA[2].id
-    // status: 'Aberta'
+    targetQuantity: 150,
   },
   {
-    quantity: 75,
-    // skuId will be DUMMY_SKUS_DATA[3].id
-    // status: 'Concluída'
+    targetQuantity: 75,
+    producedQuantity: 80, // Exemplo: produziu um pouco mais
     startTime: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
     endTime: new Date(now.getTime() - 3 * 30 * 60 * 1000).toISOString(),
-    productionTime: 1800, // 30 minutos
+    productionTime: 1800,
     notes: "Lote de borrachas finalizado."
   }
 ];
 
 export const DUMMY_DEMANDS_DATA: Omit<Demand, 'id' | 'createdAt' | 'skuId'>[] = [
-  // Estes serão ligados aos SKUs por índice na inicialização do contexto
-  { monthYear: '2024-07', targetQuantity: 500 }, // skuId will be DUMMY_SKUS_DATA[0].id
-  { monthYear: '2024-07', targetQuantity: 250 }, // skuId will be DUMMY_SKUS_DATA[1].id
-  { monthYear: '2024-08', targetQuantity: 600 }, // skuId will be DUMMY_SKUS_DATA[0].id
-  { monthYear: '2024-08', targetQuantity: 300 }, // skuId will be DUMMY_SKUS_DATA[2].id
-  { monthYear: '2024-09', targetQuantity: 400 }, // skuId will be DUMMY_SKUS_DATA[1].id
+  { monthYear: '2024-07', targetQuantity: 500 },
+  { monthYear: '2024-07', targetQuantity: 250 },
+  { monthYear: '2024-08', targetQuantity: 600 },
+  { monthYear: '2024-08', targetQuantity: 300 },
+  { monthYear: '2024-09', targetQuantity: 400 },
 ];
 
 // Chaves para localStorage

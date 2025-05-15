@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,11 +30,12 @@ import type { ProductionOrder, ProductionOrderStatus } from "@/types";
 import { PRODUCTION_ORDER_STATUSES } from "@/lib/constants";
 import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from "lucide-react"; // Edit icon não é usado aqui
+import { PlusCircle } from "lucide-react";
 
 const poFormSchema = z.object({
   skuId: z.string().min(1, "SKU é obrigatório."),
-  quantity: z.coerce.number().min(1, "Quantidade deve ser pelo menos 1."),
+  targetQuantity: z.coerce.number().min(1, "Quantidade alvo deve ser pelo menos 1."),
+  producedQuantity: z.coerce.number().min(0, "Quantidade produzida não pode ser negativa.").optional(),
   notes: z.string().optional(),
   status: z.custom<ProductionOrderStatus>((val) => PRODUCTION_ORDER_STATUSES.includes(val as ProductionOrderStatus), {
     message: "Status inválido."
@@ -48,21 +50,32 @@ interface PoFormDialogProps {
 }
 
 export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
-  const { skus, addProductionOrder, updateProductionOrder, findSkuById } = useAppContext();
+  const { skus, addProductionOrder, updateProductionOrder, findSkuById, stopProductionOrderTimer } = useAppContext();
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
   const getInitialValues = useCallback(() => {
-    return productionOrder 
-    ? { skuId: productionOrder.skuId, quantity: productionOrder.quantity, notes: productionOrder.notes || "", status: productionOrder.status }
-    : { skuId: "", quantity: 1, notes: "", status: "Aberta" as ProductionOrderStatus };
+    return productionOrder
+    ? {
+        skuId: productionOrder.skuId,
+        targetQuantity: productionOrder.targetQuantity,
+        producedQuantity: productionOrder.producedQuantity,
+        notes: productionOrder.notes || "",
+        status: productionOrder.status
+      }
+    : {
+        skuId: "",
+        targetQuantity: 1,
+        notes: "",
+        status: "Aberta" as ProductionOrderStatus
+      };
   }, [productionOrder]);
 
   const form = useForm<PoFormValues>({
     resolver: zodResolver(poFormSchema),
     defaultValues: getInitialValues(),
   });
-  
+
   useEffect(() => {
     if (open) {
       form.reset(getInitialValues());
@@ -74,16 +87,34 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     try {
       const sku = findSkuById(data.skuId);
       if (productionOrder) {
-        updateProductionOrder(productionOrder.id, { 
-            skuId: data.skuId, 
-            quantity: data.quantity, 
+        // Se o status está sendo mudado para Concluída E producedQuantity não foi fornecido no form,
+        // mas existe um productionOrder.producedQuantity (ex: de uma finalização anterior), usamos esse.
+        // Se não, e ainda não foi fornecido, precisamos de um valor.
+        // Para simplificar, se status é 'Concluída', producedQuantity deve ser definido.
+        // A lógica de finalização com `stopProductionOrderTimer` no `CompletePoDialog` tratará do producedQuantity inicial.
+        // Este form é mais para edição.
+        let finalProducedQuantity = data.producedQuantity;
+        if (data.status === 'Concluída' && typeof data.producedQuantity !== 'number' && typeof productionOrder.producedQuantity === 'number') {
+            finalProducedQuantity = productionOrder.producedQuantity;
+        } else if (data.status === 'Concluída' && typeof data.producedQuantity !== 'number') {
+            // Caso o usuário mude para concluída aqui e não tenha vindo do CompletePoDialog
+            // e não tenha preenchido o campo (que deveria ser obrigatório visualmente)
+            // Poderíamos lançar um erro ou usar targetQuantity. Por ora, toast de erro.
+            toast({title: "Erro", description: "Quantidade produzida é obrigatória ao concluir uma ordem.", variant: "destructive"});
+            return;
+        }
+
+
+        updateProductionOrder(productionOrder.id, {
+            skuId: data.skuId,
+            targetQuantity: data.targetQuantity,
+            producedQuantity: data.status === 'Concluída' ? finalProducedQuantity : undefined, // Só salva se concluída
             notes: data.notes,
-            ...(data.status && { status: data.status }) 
+            ...(data.status && { status: data.status })
         });
         toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code}) atualizada.` });
       } else {
-        // Status é definido como 'Aberta' por padrão no addProductionOrder context
-        addProductionOrder({ skuId: data.skuId, quantity: data.quantity, notes: data.notes });
+        addProductionOrder({ skuId: data.skuId, targetQuantity: data.targetQuantity, notes: data.notes });
         toast({ title: "Ordem de Produção Adicionada", description: `Nova OP para ${sku?.code} adicionada.` });
       }
       setOpen(false);
@@ -92,6 +123,11 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
       console.error("Erro ao salvar OP:", error);
     }
   };
+
+  const currentStatus = form.watch("status");
+  const isEditingCompletedOrder = productionOrder?.status === 'Concluída';
+  const isStatusChangingToCompleted = currentStatus === 'Concluída';
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -135,10 +171,10 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             />
             <FormField
               control={form.control}
-              name="quantity"
+              name="targetQuantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quantidade</FormLabel>
+                  <FormLabel>Quantidade Alvo</FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="100" {...field} disabled={!!productionOrder && productionOrder.status !== 'Aberta'}/>
                   </FormControl>
@@ -146,17 +182,17 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                 </FormItem>
               )}
             />
-             {productionOrder && ( 
+            {productionOrder && (
               <FormField
                 control={form.control}
                 name="status"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <Select
+                      onValueChange={field.onChange}
                       value={field.value}
-                      disabled={productionOrder.status === 'Concluída' || productionOrder.status === 'Cancelada' || productionOrder.status === 'Em Progresso' } // Não permitir mudar status via form se já iniciado/concluido/cancelado
+                      disabled={productionOrder.status === 'Concluída' || productionOrder.status === 'Cancelada' || productionOrder.status === 'Em Progresso'}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -165,10 +201,29 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                       </FormControl>
                       <SelectContent>
                         {PRODUCTION_ORDER_STATUSES.map(s => (
-                          <SelectItem key={s} value={s} disabled={s === 'Em Progresso' || s === 'Concluída' && productionOrder.status === 'Aberta'}>{s}</SelectItem>
+                          <SelectItem key={s} value={s}
+                           disabled={(s === 'Em Progresso' || s === 'Concluída') && productionOrder.status === 'Aberta' || (s === 'Aberta' && productionOrder.status !== 'Aberta')}
+                          >
+                            {s}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {(isEditingCompletedOrder || (productionOrder && isStatusChangingToCompleted)) && (
+               <FormField
+                control={form.control}
+                name="producedQuantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantidade Produzida</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="Ex: 95" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -189,7 +244,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={productionOrder && (productionOrder.status === 'Concluída' || productionOrder.status === 'Cancelada')}>Salvar Ordem</Button>
+              <Button type="submit" disabled={productionOrder && (productionOrder.status === 'Concluída' || productionOrder.status === 'Cancelada') && !isStatusChangingToCompleted && !isEditingCompletedOrder}>Salvar Ordem</Button>
             </DialogFooter>
           </form>
         </Form>

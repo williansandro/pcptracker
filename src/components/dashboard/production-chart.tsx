@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts"
@@ -15,7 +16,7 @@ const defaultChartConfig = {
   },
   target: {
     label: "Meta",
-    color: "hsl(var(--secondary-foreground))",
+    color: "hsl(var(--secondary-foreground))", // Ajustado para melhor contraste ou distinção
   },
 } satisfies ChartConfig
 
@@ -25,19 +26,19 @@ export function ProductionChart() {
   const chartData = useMemo(() => {
     const today = new Date();
     const lastSixMonths = Array.from({ length: 6 }).map((_, i) => {
-      return startOfMonth(subMonths(today, 5 - i)); // Corrected: Go from 5 months ago to current month
+      return startOfMonth(subMonths(today, 5 - i));
     });
 
     return lastSixMonths.map(monthDate => {
       const monthYearStr = format(monthDate, 'yyyy-MM');
-      
+
       const monthlyDemands = demands.filter(d => d.monthYear === monthYearStr);
       const target = monthlyDemands.reduce((sum, d) => sum + d.targetQuantity, 0);
-      
+
       const monthlyProduction = productionOrders
-        .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(monthYearStr))
-        .reduce((sum, po) => sum + po.quantity, 0);
-        
+        .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(monthYearStr) && typeof po.producedQuantity === 'number')
+        .reduce((sum, po) => sum + po.producedQuantity!, 0); // Usar producedQuantity
+
       return {
         month: format(monthDate, "MMM", { locale: ptBR }),
         produced: monthlyProduction,
@@ -55,7 +56,7 @@ export function ProductionChart() {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={chartData}>
+          <BarChart data={chartData} barGap={8} barCategoryGap="20%">
             <XAxis
               dataKey="month"
               stroke="hsl(var(--foreground))"

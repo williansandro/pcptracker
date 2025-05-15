@@ -77,8 +77,8 @@ export const getDemandColumns = (
         const demand = row.original;
         const productionOrders = getProductionOrdersBySku(demand.skuId);
         const producedInMonth = productionOrders
-          .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear))
-          .reduce((sum, po) => sum + po.quantity, 0);
+          .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear) && typeof po.producedQuantity === 'number')
+          .reduce((sum, po) => sum + po.producedQuantity!, 0); // Usar producedQuantity
         return producedInMonth.toLocaleString('pt-BR');
       },
     },
@@ -89,11 +89,11 @@ export const getDemandColumns = (
         const demand = row.original;
         const productionOrders = getProductionOrdersBySku(demand.skuId);
         const producedInMonth = productionOrders
-          .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear))
-          .reduce((sum, po) => sum + po.quantity, 0);
-        
-        const progressPercentage = demand.targetQuantity > 0 
-          ? Math.min(Math.round((producedInMonth / demand.targetQuantity) * 100), 100) 
+          .filter(po => po.status === 'Concluída' && po.endTime?.startsWith(demand.monthYear) && typeof po.producedQuantity === 'number')
+          .reduce((sum, po) => sum + po.producedQuantity!, 0); // Usar producedQuantity
+
+        const progressPercentage = demand.targetQuantity > 0
+          ? Math.min(Math.round((producedInMonth / demand.targetQuantity) * 100), 100)
           : 0;
         return (
           <div className="flex items-center">
