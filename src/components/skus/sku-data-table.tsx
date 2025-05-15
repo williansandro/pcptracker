@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -12,6 +13,7 @@ import {
   type SortingState,
   type VisibilityState,
   type ColumnFiltersState,
+  type Row,
 } from "@tanstack/react-table";
 
 import {
@@ -23,15 +25,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { DataTablePagination } from "@/components/data-table-pagination";
 import { SkuFormDialog } from "./sku-form-dialog";
+import { useAppContext } from "@/contexts/app-context";
+import type { SKU } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
 }
 
-export function SkuDataTable<TData, TValue>({
+export function SkuDataTable<TData extends SKU, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
@@ -39,6 +57,10 @@ export function SkuDataTable<TData, TValue>({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
+
+  const { deleteSelectedSkus } = useAppContext();
+  const { toast } = useToast();
 
   const table = useReactTable({
     data,
@@ -59,6 +81,27 @@ export function SkuDataTable<TData, TValue>({
     },
   });
 
+  const selectedRows = table.getFilteredSelectedRowModel().rows;
+
+  const handleDeleteSelected = () => {
+    const idsToDelete = selectedRows.map(row => row.original.id);
+    try {
+      deleteSelectedSkus(idsToDelete);
+      toast({
+        title: "SKUs Excluídos",
+        description: `${idsToDelete.length} SKU(s) e seus dados associados foram excluídos com sucesso.`,
+      });
+      table.resetRowSelection();
+    } catch (error) {
+      toast({
+        title: "Erro ao Excluir",
+        description: "Não foi possível excluir os SKUs selecionados.",
+        variant: "destructive",
+      });
+    }
+    setIsConfirmOpen(false);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -70,7 +113,38 @@ export function SkuDataTable<TData, TValue>({
           }
           className="max-w-sm"
         />
-        <SkuFormDialog />
+        <div className="flex items-center space-x-2">
+          {selectedRows.length > 0 && (
+            <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir Selecionado(s) ({selectedRows.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar Exclusão em Massa</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja excluir {selectedRows.length} SKU(s) selecionado(s)?
+                    Todas as Ordens de Produção e Demandas associadas a estes SKUs também serão excluídas.
+                    Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteSelected}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Excluir {selectedRows.length} SKU(s)
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <SkuFormDialog />
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>
@@ -126,3 +200,4 @@ export function SkuDataTable<TData, TValue>({
     </div>
   );
 }
+

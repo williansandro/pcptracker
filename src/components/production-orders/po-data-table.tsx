@@ -13,6 +13,7 @@ import {
   type SortingState,
   type VisibilityState,
   type ColumnFiltersState,
+  type Row,
 } from "@tanstack/react-table";
 
 import {
@@ -24,30 +25,46 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { DataTablePagination } from "@/components/data-table-pagination";
 import { PoFormDialog } from "./po-form-dialog";
-import { useAppContext } from "@/contexts/app-context"; 
-import { getPoColumns } from "./po-columns"; 
+import { useAppContext } from "@/contexts/app-context";
+import { getPoColumns } from "./po-columns";
+import type { ProductionOrder } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface PoDataTableProps<TData, TValue> {
   data: TData[];
 }
 
-export function PoDataTable<TData, TValue>({
+export function PoDataTable<TData extends ProductionOrder, TValue>({
   data,
 }: PoDataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
 
-  const { findSkuById, skus } = useAppContext(); 
+  const { findSkuById, skus, deleteSelectedProductionOrders } = useAppContext();
+  const { toast } = useToast();
 
   const columns = React.useMemo(
-    () => getPoColumns(findSkuById) as ColumnDef<TData, TValue>[], 
-    [findSkuById, skus] // Adicionado skus para re-renderizar colunas se SKUs mudarem
+    () => getPoColumns(findSkuById) as ColumnDef<TData, TValue>[],
+    [findSkuById, skus]
   );
-
 
   const table = useReactTable({
     data,
@@ -68,6 +85,27 @@ export function PoDataTable<TData, TValue>({
     },
   });
 
+  const selectedRows = table.getFilteredSelectedRowModel().rows;
+
+  const handleDeleteSelected = () => {
+    const idsToDelete = selectedRows.map(row => row.original.id);
+    try {
+      deleteSelectedProductionOrders(idsToDelete);
+      toast({
+        title: "Ordens de Produção Excluídas",
+        description: `${idsToDelete.length} OP(s) foram excluídas com sucesso.`,
+      });
+      table.resetRowSelection();
+    } catch (error) {
+      toast({
+        title: "Erro ao Excluir",
+        description: "Não foi possível excluir as OPs selecionadas.",
+        variant: "destructive",
+      });
+    }
+    setIsConfirmOpen(false);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -79,7 +117,37 @@ export function PoDataTable<TData, TValue>({
           }
           className="max-w-sm"
         />
-        <PoFormDialog />
+        <div className="flex items-center space-x-2">
+          {selectedRows.length > 0 && (
+            <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir Selecionada(s) ({selectedRows.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar Exclusão em Massa</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja excluir {selectedRows.length} Ordem(ns) de Produção selecionada(s)?
+                    Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteSelected}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Excluir {selectedRows.length} OP(s)
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <PoFormDialog />
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>
@@ -135,3 +203,4 @@ export function PoDataTable<TData, TValue>({
     </div>
   );
 }
+

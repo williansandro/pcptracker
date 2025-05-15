@@ -83,12 +83,14 @@ interface AppContextType {
   addSku: (skuData: Omit<SKU, 'id' | 'createdAt'>) => void;
   updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => void;
   deleteSku: (skuId: string) => void;
+  deleteSelectedSkus: (skuIds: string[]) => void;
   findSkuById: (skuId: string) => SKU | undefined;
 
   productionOrders: ProductionOrder[];
   addProductionOrder: (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity'>) => void;
   updateProductionOrder: (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => void;
   deleteProductionOrder: (poId: string) => void;
+  deleteSelectedProductionOrders: (poIds: string[]) => void;
   startProductionOrderTimer: (poId: string) => void;
   stopProductionOrderTimer: (poId: string, producedQuantity: number) => void;
   findProductionOrderById: (poId: string) => ProductionOrder | undefined;
@@ -98,6 +100,7 @@ interface AppContextType {
   addDemand: (demandData: Omit<Demand, 'id' | 'createdAt'>) => void;
   updateDemand: (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => void;
   deleteDemand: (demandId: string) => void;
+  deleteSelectedDemands: (demandIds: string[]) => void;
   findDemandBySkuAndMonth: (skuId: string, monthYear: string) => Demand | undefined;
   isDataReady: boolean;
 }
@@ -164,8 +167,14 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteSku = useCallback((skuId: string) => {
     setSkus(prev => prev.filter(s => s.id !== skuId));
-    setProductionOrders(prev => prev.filter(po => po.skuId !== skuId));
-    setDemands(prev => prev.filter(d => d.skuId !== skuId));
+    setProductionOrders(prevPOs => prevPOs.filter(po => po.skuId !== skuId));
+    setDemands(prevDemands => prevDemands.filter(d => d.skuId !== skuId));
+  }, []);
+
+  const deleteSelectedSkus = useCallback((skuIds: string[]) => {
+    setSkus(prev => prev.filter(s => !skuIds.includes(s.id)));
+    setProductionOrders(prevPOs => prevPOs.filter(po => !skuIds.includes(po.skuId)));
+    setDemands(prevDemands => prevDemands.filter(d => !skuIds.includes(d.skuId)));
   }, []);
 
   const findSkuById = useCallback((skuId: string) => skus.find(s => s.id === skuId), [skus]);
@@ -187,6 +196,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteProductionOrder = useCallback((poId: string) => {
     setProductionOrders(prev => prev.filter(po => po.id !== poId));
+  }, []);
+
+  const deleteSelectedProductionOrders = useCallback((poIds: string[]) => {
+    setProductionOrders(prev => prev.filter(po => !poIds.includes(po.id)));
   }, []);
 
   const startProductionOrderTimer = useCallback((poId: string) => {
@@ -224,6 +237,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setDemands(prev => prev.filter(d => d.id !== demandId));
   }, []);
 
+  const deleteSelectedDemands = useCallback((demandIds: string[]) => {
+    setDemands(prev => prev.filter(d => !demandIds.includes(d.id)));
+  }, []);
+
   const findDemandBySkuAndMonth = useCallback((skuId: string, monthYear: string) => {
     return demands.find(d => d.skuId === skuId && d.monthYear === monthYear);
   }, [demands]);
@@ -233,11 +250,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     addSku,
     updateSku,
     deleteSku,
+    deleteSelectedSkus,
     findSkuById,
     productionOrders: isMounted ? productionOrders : [],
     addProductionOrder,
     updateProductionOrder,
     deleteProductionOrder,
+    deleteSelectedProductionOrders,
     startProductionOrderTimer,
     stopProductionOrderTimer,
     findProductionOrderById,
@@ -246,13 +265,14 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     addDemand,
     updateDemand,
     deleteDemand,
+    deleteSelectedDemands,
     findDemandBySkuAndMonth,
     isDataReady: isMounted,
   }), [
     isMounted, skus, productionOrders, demands,
-    addSku, updateSku, deleteSku, findSkuById,
-    addProductionOrder, updateProductionOrder, deleteProductionOrder, startProductionOrderTimer, stopProductionOrderTimer, findProductionOrderById, getProductionOrdersBySku,
-    addDemand, updateDemand, deleteDemand, findDemandBySkuAndMonth
+    addSku, updateSku, deleteSku, deleteSelectedSkus, findSkuById,
+    addProductionOrder, updateProductionOrder, deleteProductionOrder, deleteSelectedProductionOrders, startProductionOrderTimer, stopProductionOrderTimer, findProductionOrderById, getProductionOrdersBySku,
+    addDemand, updateDemand, deleteDemand, deleteSelectedDemands, findDemandBySkuAndMonth
   ]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
@@ -265,3 +285,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
