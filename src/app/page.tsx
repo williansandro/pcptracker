@@ -5,7 +5,7 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon } from 'lucide-react'; // Adicionado PieChartIcon, BarChartIcon
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks } from 'lucide-react';
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -13,15 +13,25 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts'; // Adicionado PieChart, Pie, Cell, e outros para Recharts
-import type { ProductionOrderStatus } from '@/types';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ClientSideDateTime } from "@/components/client-side-date-time";
+import { formatDuration } from "@/lib/utils";
+import { ptBR } from 'date-fns/locale';
+import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
 
 const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
-  Aberta: "hsl(var(--chart-3))", // Azul claro
-  "Em Progresso": "hsl(var(--chart-4))", // Laranja/Amarelo
-  Concluída: "hsl(var(--chart-2))", // Verde/Teal
-  Cancelada: "hsl(var(--chart-5))", // Vermelho/Cinza
+  Aberta: "hsl(var(--chart-3))", 
+  "Em Progresso": "hsl(var(--chart-4))", 
+  Concluída: "hsl(var(--chart-2))", 
+  Cancelada: "hsl(var(--chart-5))", 
 };
+
+interface CompletedPoDetails extends ProductionOrder {
+  skuCode: string;
+  skuDescription: string;
+  secondsPerUnit: string | number;
+}
 
 export default function DashboardPage() {
   const { skus, productionOrders, findSkuById } = useAppContext();
@@ -75,6 +85,24 @@ export default function DashboardPage() {
       .map((item, index) => ({ ...item, fill: `hsl(var(--chart-${index + 1}))` }));
   }, [productionOrders, findSkuById]);
 
+  const completedPoDetails = useMemo(() => {
+    return productionOrders
+      .filter(po => po.status === 'Concluída')
+      .map(po => {
+        const sku = findSkuById(po.skuId);
+        const secondsPerUnit = (po.productionTime && po.producedQuantity && po.producedQuantity > 0)
+          ? (po.productionTime / po.producedQuantity).toFixed(2)
+          : 'N/D';
+        return {
+          ...po,
+          skuCode: sku?.code || 'N/D',
+          skuDescription: sku?.description || 'SKU não encontrado',
+          secondsPerUnit,
+        };
+      })
+      .sort((a, b) => new Date(b.endTime || 0).getTime() - new Date(a.endTime || 0).getTime()); // Mais recentes primeiro
+  }, [productionOrders, findSkuById]);
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,7 +149,7 @@ export default function DashboardPage() {
                         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                        return (percent * 100) > 5 ? ( // Only show label if percentage is > 5%
+                        return (percent * 100) > 5 ? ( 
                           <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
                             {`${(percent * 100).toFixed(0)}%`}
                           </text>
@@ -176,7 +204,55 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ListChecks className="h-5 w-5 text-primary" />
+            Detalhes de Ordens Concluídas
+          </CardTitle>
+          <CardDescription>Lista de OPs finalizadas com tempos e eficiência unitária.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {completedPoDetails.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-center">Início</TableHead>
+                    <TableHead className="text-center">Fim</TableHead>
+                    <TableHead className="text-center">Tempo Total</TableHead>
+                    <TableHead className="text-right">Qtd. Prod.</TableHead>
+                    <TableHead className="text-right">Seg/Unid.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {completedPoDetails.map((po) => (
+                    <TableRow key={po.id}>
+                      <TableCell>
+                        <div className="font-medium">{po.skuCode}</div>
+                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">{po.skuDescription}</div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <ClientSideDateTime dateString={po.startTime} outputFormat="dd/MM HH:mm" locale={ptBR} placeholder="-" />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <ClientSideDateTime dateString={po.endTime} outputFormat="dd/MM HH:mm" locale={ptBR} placeholder="-" />
+                      </TableCell>
+                      <TableCell className="text-center">{formatDuration(po.productionTime)}</TableCell>
+                      <TableCell className="text-right">{po.producedQuantity?.toLocaleString('pt-BR') || '-'}</TableCell>
+                      <TableCell className="text-right">{po.secondsPerUnit}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-10">Nenhuma ordem de produção concluída para exibir.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

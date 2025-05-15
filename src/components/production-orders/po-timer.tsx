@@ -3,17 +3,10 @@
 import { useEffect, useState } from 'react';
 import type { ProductionOrder } from '@/types';
 import { Clock } from 'lucide-react';
+import { formatDuration } from '@/lib/utils'; // Importar de utils
 
 interface PoTimerProps {
   productionOrder: ProductionOrder;
-}
-
-function formatDuration(totalSeconds: number): string {
-  if (totalSeconds < 0) totalSeconds = 0;
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
 export function PoTimer({ productionOrder }: PoTimerProps) {
