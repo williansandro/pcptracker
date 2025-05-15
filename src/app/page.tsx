@@ -232,7 +232,7 @@ export default function DashboardPage() {
                     <TableRow 
                       key={po.id}
                       className={cn(
-                        index % 2 !== 0 ? "bg-[#9B9AC1]" : ""
+                        index % 2 !== 0 ? "bg-[#DADCE1]" : ""
                       )}
                     >
                       <TableCell>
