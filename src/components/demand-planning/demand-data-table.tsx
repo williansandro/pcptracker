@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface DemandDataTableProps<TData, TValue> {
   data: TData[];
@@ -171,10 +172,13 @@ export function DemandDataTable<TData extends Demand, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row, index) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className={cn(
+                    index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
+                  )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

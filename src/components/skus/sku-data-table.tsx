@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -193,10 +194,13 @@ export function SkuDataTable<TData extends SKU, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row, index) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className={cn(
+                    index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
+                  )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
