@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClientSideDateTime } from "@/components/client-side-date-time";
-import { formatDuration } from "@/lib/utils";
+import { formatDuration, cn } from "@/lib/utils";
 import { ptBR } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
@@ -228,8 +228,13 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {completedPoDetails.map((po) => (
-                    <TableRow key={po.id}>
+                  {completedPoDetails.map((po, index) => (
+                    <TableRow 
+                      key={po.id}
+                      className={cn(
+                        index % 2 !== 0 ? "bg-[#9B9AC1]" : ""
+                      )}
+                    >
                       <TableCell>
                         <div className="font-medium">{po.skuCode}</div>
                         <div className="text-xs text-muted-foreground truncate max-w-[200px]">{po.skuDescription}</div>
@@ -256,3 +261,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
