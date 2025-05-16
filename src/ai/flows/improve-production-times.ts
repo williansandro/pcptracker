@@ -70,16 +70,26 @@ const improveProductionTimesFlow = ai.defineFlow(
     outputSchema: ImproveProductionTimesOutputSchema,
   },
   async input => {
-    const llmResponse = await prompt(input);
-    if (!llmResponse.output) {
-      console.error(
-        "Genkit flow 'improveProductionTimesFlow' recebeu uma saída nula ou inválida do LLM. Resposta completa:",
-        JSON.stringify(llmResponse, null, 2)
-      );
+    try {
+      const llmResponse = await prompt(input);
+      if (!llmResponse.output) {
+        console.error(
+          "Genkit flow 'improveProductionTimesFlow' recebeu uma saída nula ou inválida do LLM. Resposta completa:",
+          JSON.stringify(llmResponse, null, 2)
+        );
+        throw new Error(
+          'A IA não conseguiu processar os dados no formato esperado.'
+        );
+      }
+      return llmResponse.output;
+    } catch (error) {
+      console.error("Erro detalhado no fluxo 'improveProductionTimesFlow':", error);
+      // Re-lançar o erro para que a Server Action possa pegá-lo e retornar uma mensagem apropriada.
+      // Ou podemos retornar um objeto de erro estruturado aqui se preferirmos.
       throw new Error(
-        'A IA não conseguiu processar os dados no formato esperado.'
+        `Falha ao executar o fluxo de análise da IA: ${error instanceof Error ? error.message : String(error)}`
       );
     }
-    return llmResponse.output;
   }
 );
+
