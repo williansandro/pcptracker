@@ -44,7 +44,9 @@ const poFormSchema = z.object({
 })
 .superRefine((data, ctx) => {
   // data.status aqui será o status atual da OP que está sendo editada, pois o select de status é desabilitado para OPs em andamento/concluídas
-  if (data.status === 'Concluída') {
+  const currentStatus = data.status; // Usar o status que vem do formulário, que é o status original da OP
+
+  if (currentStatus === 'Concluída') {
     if (!data.startTime) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de início é obrigatória.", path: ['startTime'] });
     }
@@ -58,7 +60,7 @@ const poFormSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Quantidade produzida é obrigatória e não pode ser negativa.", path: ['producedQuantity'] });
     }
   }
-  if (data.status === 'Em Progresso') {
+  if (currentStatus === 'Em Progresso') {
     if (!data.startTime) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de início é obrigatória.", path: ['startTime'] });
     }
@@ -73,7 +75,7 @@ interface PoFormDialogProps {
 }
 
 // Helper para formatar ISO string para datetime-local input
-constformatIsoToDateTimeLocal = (isoString: string | undefined | null): string => {
+const formatIsoToDateTimeLocal = (isoString: string | undefined | null): string => {
   if (!isoString) return "";
   try {
     return format(parseISO(isoString), "yyyy-MM-dd'T'HH:mm");
@@ -107,6 +109,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
         status: "Aberta" as ProductionOrderStatus,
         startTime: "",
         endTime: "",
+        producedQuantity: undefined,
       };
   }, [productionOrder]);
 
@@ -130,16 +133,14 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
           skuId: data.skuId,
           targetQuantity: data.targetQuantity,
           notes: data.notes,
-          // Status não é editável aqui se a OP já iniciou/concluiu/cancelou, então usamos o status original.
-          // Se a lógica de status fosse alterável, data.status seria usado.
+          // status: productionOrder.status, // Manter o status original, não alterável diretamente aqui
         };
 
         if (productionOrder.status === 'Em Progresso') {
           updatePayload.startTime = data.startTime ? new Date(data.startTime).toISOString() : null;
-          // Para 'Em Progresso', endTime e productionTime devem ser nulos
           updatePayload.endTime = null;
           updatePayload.productionTime = null;
-          updatePayload.producedQuantity = null; // Ou undefined para ser removido pelo contexto se necessário
+          updatePayload.producedQuantity = null;
         } else if (productionOrder.status === 'Concluída') {
           updatePayload.startTime = data.startTime ? new Date(data.startTime).toISOString() : null;
           updatePayload.endTime = data.endTime ? new Date(data.endTime).toISOString() : null;
@@ -151,19 +152,15 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             if (endTimeMs >= startTimeMs) {
               updatePayload.productionTime = Math.floor((endTimeMs - startTimeMs) / 1000);
             } else {
-              // Validação Zod já deve pegar isso, mas é bom ter um fallback
               toast({ title: "Erro de Validação", description: "Data de término não pode ser anterior à data de início.", variant: "destructive" });
               return;
             }
           } else {
-             // Se startTime ou endTime forem nulos/inválidos para OP Concluída, o Zod deve pegar.
-             // productionTime não pode ser calculado.
              updatePayload.productionTime = null;
           }
         }
-        // Se o status original for "Aberta", não mexemos em startTime/endTime/producedQuantity/productionTime aqui,
-        // pois isso é feito ao iniciar/completar a OP através de outras ações.
-        // A edição de uma OP 'Aberta' só deve permitir mudar SKU, Qtd. Alvo, Notas.
+        // Não mexer em status ou producedQuantity se o status original for 'Aberta' ou 'Cancelada' aqui.
+        // Ações de iniciar/completar/cancelar são separadas.
 
         updateProductionOrder(productionOrder.id, updatePayload);
         toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) atualizada.` });
@@ -249,43 +246,17 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                 </FormItem>
               )}
             />
-            {/* Campo Status (apenas para visualização ou alteração se a lógica permitir) */}
+            {/* Campo Status (apenas para visualização) */}
             {productionOrder && (
               <FormField
                 control={form.control}
-                name="status"
+                name="status" // Este campo é usado para preencher o valor inicial e para a lógica de validação
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      // Desabilitado se não for 'Aberta' OU se for uma OP nova (onde o status é fixo 'Aberta' inicialmente)
-                      disabled={!!productionOrder && (currentPoStatusForEdit !== 'Aberta' || !PRODUCTION_ORDER_STATUSES.includes('Aberta'))}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {PRODUCTION_ORDER_STATUSES.map(s => (
-                          <SelectItem 
-                            key={s} 
-                            value={s}
-                            // Lógica de desabilitar opções de status
-                            disabled={
-                              (s === 'Em Progresso' && currentPoStatusForEdit !== 'Aberta') ||
-                              (s === 'Concluída' && currentPoStatusForEdit !== 'Em Progresso' && currentPoStatusForEdit !== 'Aberta') || // Teoricamente, só de Em Progresso para Concluída via ação
-                              (s === 'Aberta' && currentPoStatusForEdit !== 'Aberta' && !!productionOrder) || // Não pode voltar para Aberta
-                              (s === 'Cancelada' && currentPoStatusForEdit === 'Concluída') // Não pode cancelar uma OP concluída por aqui
-                            }
-                          >
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                       <Input {...field} readOnly disabled className="bg-muted/50" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
