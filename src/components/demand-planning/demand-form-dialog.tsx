@@ -90,6 +90,10 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
     }
   };
 
+  const sortedSkus = React.useMemo(() =>
+    [...skus].sort((a, b) => a.code.localeCompare(b.code)),
+  [skus]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -121,7 +125,7 @@ export function DemandFormDialog({ demand, trigger }: DemandFormDialogProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {skus.map(s => (
+                      {sortedSkus.map(s => (
                         <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
                       ))}
                     </SelectContent>

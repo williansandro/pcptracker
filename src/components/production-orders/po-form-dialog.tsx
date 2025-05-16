@@ -50,7 +50,7 @@ interface PoFormDialogProps {
 }
 
 export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
-  const { skus, addProductionOrder, updateProductionOrder, findSkuById, stopProductionOrderTimer } = useAppContext();
+  const { skus, addProductionOrder, updateProductionOrder, findSkuById } = useAppContext();
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
@@ -87,19 +87,10 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     try {
       const sku = findSkuById(data.skuId);
       if (productionOrder) {
-        // Se o status está sendo mudado para Concluída E producedQuantity não foi fornecido no form,
-        // mas existe um productionOrder.producedQuantity (ex: de uma finalização anterior), usamos esse.
-        // Se não, e ainda não foi fornecido, precisamos de um valor.
-        // Para simplificar, se status é 'Concluída', producedQuantity deve ser definido.
-        // A lógica de finalização com `stopProductionOrderTimer` no `CompletePoDialog` tratará do producedQuantity inicial.
-        // Este form é mais para edição.
         let finalProducedQuantity = data.producedQuantity;
         if (data.status === 'Concluída' && typeof data.producedQuantity !== 'number' && typeof productionOrder.producedQuantity === 'number') {
             finalProducedQuantity = productionOrder.producedQuantity;
         } else if (data.status === 'Concluída' && typeof data.producedQuantity !== 'number') {
-            // Caso o usuário mude para concluída aqui e não tenha vindo do CompletePoDialog
-            // e não tenha preenchido o campo (que deveria ser obrigatório visualmente)
-            // Poderíamos lançar um erro ou usar targetQuantity. Por ora, toast de erro.
             toast({title: "Erro", description: "Quantidade produzida é obrigatória ao concluir uma ordem.", variant: "destructive"});
             return;
         }
@@ -108,14 +99,14 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
         updateProductionOrder(productionOrder.id, {
             skuId: data.skuId,
             targetQuantity: data.targetQuantity,
-            producedQuantity: data.status === 'Concluída' ? finalProducedQuantity : undefined, // Só salva se concluída
+            producedQuantity: data.status === 'Concluída' ? finalProducedQuantity : undefined, 
             notes: data.notes,
             ...(data.status && { status: data.status })
         });
-        toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code}) atualizada.` });
+        toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) atualizada.` });
       } else {
         addProductionOrder({ skuId: data.skuId, targetQuantity: data.targetQuantity, notes: data.notes });
-        toast({ title: "Ordem de Produção Adicionada", description: `Nova OP para ${sku?.code} adicionada.` });
+        toast({ title: "Ordem de Produção Adicionada", description: `Nova OP para ${sku?.code || ''} adicionada.` });
       }
       setOpen(false);
     } catch (error) {
@@ -127,6 +118,10 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
   const currentStatus = form.watch("status");
   const isEditingCompletedOrder = productionOrder?.status === 'Concluída';
   const isStatusChangingToCompleted = currentStatus === 'Concluída';
+
+  const sortedSkus = React.useMemo(() => 
+    [...skus].sort((a, b) => a.code.localeCompare(b.code)), 
+  [skus]);
 
 
   return (
@@ -160,7 +155,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {skus.map(s => (
+                      {sortedSkus.map(s => (
                         <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
                       ))}
                     </SelectContent>
