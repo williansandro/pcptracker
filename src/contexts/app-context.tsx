@@ -8,6 +8,7 @@ import {
   DUMMY_SKUS_DATA,
   DUMMY_PRODUCTION_ORDERS_DATA,
   DUMMY_DEMANDS_DATA,
+  PRODUCTION_ORDER_STATUSES,
 } from '@/lib/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
@@ -22,6 +23,7 @@ import {
   where,
   getCountFromServer,
   setDoc,
+  deleteField, // Importar deleteField se necessário para remover campos
 } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 
@@ -115,7 +117,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const batchPOs = writeBatch(db);
       const seededPOs: ProductionOrder[] = [];
       DUMMY_PRODUCTION_ORDERS_DATA.forEach((poData, index) => {
-        const skuForPo = seededSkus[index % seededSkus.length]; // Garante que sempre haja um SKU
+        const skuForPo = seededSkus[index % seededSkus.length]; 
         if (!skuForPo) {
           console.warn("SKU não encontrado para popular OP, pulando:", poData);
           return;
@@ -171,7 +173,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return { skus: seededSkus, pos: seededPOs, demands: seededDemands };
     } else {
       console.log("Banco de dados já contém dados de SKUs.");
-      return null; // Indica que não houve seeding
+      return null; 
     }
   }, []);
 
@@ -181,12 +183,12 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.log("Buscando dados do Firestore...");
       const seededData = await seedDatabase();
 
-      if (seededData) { // Se o banco foi populado, usa os dados retornados para evitar re-fetch
+      if (seededData) { 
         setSkus(seededData.skus);
         setProductionOrders(seededData.pos);
         setDemands(seededData.demands);
         console.log("Dados do seeding aplicados ao estado local.");
-      } else { // Se não houve seeding, busca do banco
+      } else { 
         const skusQuery = query(collection(db, SKUS_COLLECTION));
         const skusSnapshot = await getDocs(skusQuery);
         const skusData = skusSnapshot.docs.map(d => mapDocToSku({ id: d.id, ...d.data() }));
@@ -217,8 +219,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setProductionOrders([]);
       setDemands([]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, seedDatabase]); // Adicionado seedDatabase como dependência
+  }, [toast, seedDatabase]); 
 
   useEffect(() => {
     if (!isMounted) return;
@@ -284,7 +285,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (reasons.length > 0) {
       const errorMessage = `O SKU ${skuToDelete.code} não pode ser excluído pois possui ${reasons.join(' e ')} associada(s).`;
       console.error(errorMessage);
-      throw new Error(errorMessage); // Lança para ser pego pelo SkuActions
+      toast({ title: "Falha ao Excluir", description: errorMessage, variant: "destructive" });
+      throw new Error(errorMessage); 
     }
     try {
       await deleteDoc(doc(db, SKUS_COLLECTION, skuId));
@@ -391,8 +393,19 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateProductionOrder = useCallback(async (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => {
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
-      await updateDoc(poRef, poData);
-      setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...poData } as ProductionOrder : po));
+      // Garante que `undefined` não seja enviado, o que causa erro no Firestore.
+      // Se um campo deve ser removido, use deleteField(). Se deve ser nulo, use null.
+      const updateData = Object.entries(poData).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key as keyof typeof poData] = value;
+        }
+        return acc;
+      }, {} as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+      if (Object.keys(updateData).length > 0) {
+        await updateDoc(poRef, updateData);
+      }
+      setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po));
     } catch (error: any) {
       console.error("Erro ao atualizar Ordem de Produção:", poId, error);
       toast({
@@ -439,7 +452,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         toast({ title: "Ação Inválida", description: "Só é possível iniciar OPs com status 'Aberta'.", variant: "default" });
         return;
     }
-    const updateData = { status: 'Em Progresso' as ProductionOrderStatus, startTime: new Date().toISOString(), endTime: undefined, productionTime: undefined };
+    // Alterado para usar null em vez de undefined para compatibilidade com Firestore
+    const updateData = { 
+      status: 'Em Progresso' as ProductionOrderStatus, 
+      startTime: new Date().toISOString(), 
+      endTime: null, 
+      productionTime: null 
+    };
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
       await updateDoc(poRef, updateData);
@@ -460,7 +479,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const poToUpdate = productionOrders.find(po => po.id === poId);
     if (poToUpdate && poToUpdate.status === 'Em Progresso' && poToUpdate.startTime) {
       const endTime = new Date();
-      const productionTime = Math.floor((endTime.getTime() - new Date(poToUpdate.startTime).getTime()) / 1000); // em segundos
+      const productionTime = Math.floor((endTime.getTime() - new Date(poToUpdate.startTime).getTime()) / 1000); 
       const updateData = { status: 'Concluída' as ProductionOrderStatus, endTime: endTime.toISOString(), productionTime, producedQuantity };
       try {
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
@@ -503,8 +522,18 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateDemand = useCallback(async (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => {
     try {
       const demandRef = doc(db, DEMANDS_COLLECTION, demandId);
-      await updateDoc(demandRef, demandData);
-      setDemands(prev => prev.map(d => d.id === demandId ? { ...d, ...demandData } as Demand : d));
+      // Garante que `undefined` não seja enviado
+      const updateData = Object.entries(demandData).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key as keyof typeof demandData] = value;
+        }
+        return acc;
+      }, {} as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+      if (Object.keys(updateData).length > 0) {
+        await updateDoc(demandRef, updateData);
+      }
+      setDemands(prev => prev.map(d => d.id === demandId ? { ...d, ...updateData } as Demand : d));
     } catch (error: any) {
       console.error("Erro ao atualizar Demanda:", demandId, error);
       toast({
@@ -571,7 +600,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     deleteDemand,
     deleteSelectedDemands,
     findDemandBySkuAndMonth,
-    isDataReady: isMounted, // isDataReady agora reflete se o cliente montou e os dados podem ser considerados prontos
+    isDataReady: isMounted, 
   }), [
     isMounted, skus, productionOrders, demands,
     addSku, updateSku, deleteSku, deleteSelectedSkus, findSkuById,
@@ -590,3 +619,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
