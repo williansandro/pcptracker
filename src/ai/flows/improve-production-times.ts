@@ -70,8 +70,16 @@ const improveProductionTimesFlow = ai.defineFlow(
     outputSchema: ImproveProductionTimesOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const llmResponse = await prompt(input);
+    if (!llmResponse.output) {
+      console.error(
+        "Genkit flow 'improveProductionTimesFlow' recebeu uma saída nula ou inválida do LLM. Resposta completa:",
+        JSON.stringify(llmResponse, null, 2)
+      );
+      throw new Error(
+        'A IA não conseguiu processar os dados no formato esperado.'
+      );
+    }
+    return llmResponse.output;
   }
 );
-
