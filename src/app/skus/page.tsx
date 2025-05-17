@@ -1,9 +1,11 @@
+
 "use client";
 
 import { useAppContext } from "@/contexts/app-context";
 import { skuColumns } from "@/components/skus/sku-columns";
 import { SkuDataTable } from "@/components/skus/sku-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SkuInlineForm } from "@/components/skus/sku-inline-form"; // Re-adicionando a importação
 
 export default function SkusPage() {
   const { skus } = useAppContext();
@@ -18,6 +20,9 @@ export default function SkusPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-6"> {/* Adicionando um wrapper para o formulário inline com margem inferior */}
+            <SkuInlineForm />
+          </div>
           <SkuDataTable columns={skuColumns} data={skus} />
         </CardContent>
       </Card>
