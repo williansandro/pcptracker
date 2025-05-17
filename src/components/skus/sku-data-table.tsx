@@ -12,7 +12,6 @@ import {
   type ColumnDef,
   type SortingState,
   type VisibilityState,
-  type ColumnFiltersState, // Não mais usado diretamente para filtro de código via input
 } from "@tanstack/react-table";
 
 import {
@@ -23,10 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-// import { Input } from "@/components/ui/input"; // Removido
 import { Button } from "@/components/ui/button";
 import { DataTablePagination } from "@/components/data-table-pagination";
-// SkuFormDialog não é mais usado para "Adicionar" aqui, SkuInlineForm cuida disso.
 import { useAppContext } from "@/contexts/app-context";
 import type { SKU } from "@/types";
 import {
@@ -39,15 +36,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Filter } from "lucide-react"; // Adicionado Filter
+import { Trash2, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
-import { SkuInlineForm } from "./sku-inline-form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Adicionado
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DataTableProps<TData extends SKU, TValue> {
   columns: ColumnDef<TData, TValue>[];
-  data: TData[]; // Recebe todos os SKUs
+  data: TData[];
 }
 
 export function SkuDataTable<TData extends SKU, TValue>({
@@ -55,11 +50,10 @@ export function SkuDataTable<TData extends SKU, TValue>({
   data,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  // const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]); // Não mais usado para filtro de código
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
-  const [skuFilter, setSkuFilter] = React.useState<string>("all"); // para ID do SKU ou "all"
+  const [skuFilter, setSkuFilter] = React.useState<string>("all");
 
   const { deleteSelectedSkus } = useAppContext();
   const { toast } = useToast();
@@ -76,10 +70,9 @@ export function SkuDataTable<TData extends SKU, TValue>({
   }, [data, skuFilter]);
 
   const table = useReactTable({
-    data: filteredData, // Usar dados filtrados
+    data: filteredData,
     columns,
     onSortingChange: setSorting,
-    // onColumnFiltersChange: setColumnFilters, // Não mais usado para filtro de código
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
@@ -88,7 +81,6 @@ export function SkuDataTable<TData extends SKU, TValue>({
     getSortedRowModel: getSortedRowModel(),
     state: {
       sorting,
-      // columnFilters, // Não mais usado para filtro de código
       columnVisibility,
       rowSelection,
     },
@@ -144,9 +136,9 @@ export function SkuDataTable<TData extends SKU, TValue>({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <Select onValueChange={setSkuFilter} value={skuFilter}>
-          <SelectTrigger className="w-[280px] h-10">
+          <SelectTrigger className="w-full md:w-[280px] h-10">
             <div className="flex items-center">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Filtrar por SKU..." />
@@ -159,7 +151,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
             ))}
           </SelectContent>
         </Select>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 self-end md:self-center">
           {selectedRows.length > 0 && (
             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
               <AlertDialogTrigger asChild>
@@ -188,10 +180,9 @@ export function SkuDataTable<TData extends SKU, TValue>({
               </AlertDialogContent>
             </AlertDialog>
           )}
-          {/* O botão de adicionar é agora o formulário inline, não mais um SkuFormDialog aqui */}
         </div>
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

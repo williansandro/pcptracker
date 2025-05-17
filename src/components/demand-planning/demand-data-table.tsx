@@ -11,7 +11,6 @@ import {
   useReactTable,
   type SortingState,
   type VisibilityState,
-  type ColumnFiltersState,
 } from "@tanstack/react-table";
 
 import {
@@ -41,7 +40,6 @@ import {
 import { Trash2, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 
 interface DemandDataTableProps<TData extends Demand, TValue> {
   data: TData[];
@@ -121,9 +119,9 @@ export function DemandDataTable<TData extends Demand, TValue>({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <Select onValueChange={setSkuFilter} value={skuFilter}>
-          <SelectTrigger className="w-[280px] h-10">
+          <SelectTrigger className="w-full md:w-[280px] h-10">
              <div className="flex items-center">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Filtrar por SKU..." />
@@ -136,7 +134,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
             ))}
           </SelectContent>
         </Select>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 self-end md:self-center">
           {selectedRows.length > 0 && (
             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
               <AlertDialogTrigger asChild>
@@ -168,7 +166,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
           <DemandFormDialog />
         </div>
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

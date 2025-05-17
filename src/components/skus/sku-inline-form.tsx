@@ -43,12 +43,11 @@ export function SkuInlineForm() {
     try {
       await addSku(data);
       toast({ title: "SKU Adicionado", description: `SKU ${data.code} adicionado com sucesso.` });
-      form.reset(); 
+      form.reset();
     } catch (error: any) {
+      // O toast de erro já é tratado no AppContext ou na chamada de addSku.
+      // Não é necessário exibir outro toast aqui, a menos que queira uma mensagem específica para o formulário.
       console.error("Erro ao adicionar SKU (formulário inline):", error);
-      // O toast de erro já é tratado no AppContext, mas podemos adicionar um específico aqui se necessário.
-      // Se addSku relançar o erro, podemos até evitar o toast aqui para não duplicar.
-      // Por enquanto, o relançamento do erro no addSku e o toast lá parecem suficientes.
     }
   };
 
@@ -86,7 +85,7 @@ export function SkuInlineForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="md:col-span-1 h-10 self-end" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="md:col-span-1 h-10 self-start md:self-end" disabled={form.formState.isSubmitting}>
               <PlusCircle className="mr-2 h-4 w-4" />
               {form.formState.isSubmitting ? "Adicionando..." : "Adicionar SKU"}
             </Button>

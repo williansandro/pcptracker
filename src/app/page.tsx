@@ -23,10 +23,10 @@ import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
-  Aberta: "hsl(var(--chart-3))", // Orange
-  "Em Progresso": "hsl(var(--chart-4))", // Green
-  Concluída: "hsl(var(--chart-2))", // Purple
-  Cancelada: "hsl(var(--chart-5))", // Pink/Magenta
+  Aberta: "hsl(var(--chart-3))", // Laranja
+  "Em Progresso": "hsl(var(--chart-4))", // Verde
+  Concluída: "hsl(var(--chart-2))", // Roxo
+  Cancelada: "hsl(var(--chart-5))", // Rosa/Magenta
 };
 
 const CHART_COLORS = [
@@ -90,8 +90,6 @@ export default function DashboardPage() {
 
   const topSkusByProducedQuantityData = useMemo(() => {
     const skuProduction: Record<string, { totalProduced: number; skuObject: SKU }> = {};
-    // Para o Top SKUs, usamos todas as OPs, não apenas as filtradas,
-    // pois o filtro de SKU é aplicado AO CLICAR neste gráfico.
     allProductionOrders.forEach(po => {
       if (po.status === 'Concluída' && po.producedQuantity && po.producedQuantity > 0) {
         const sku = findSkuById(po.skuId);
@@ -112,7 +110,7 @@ export default function DashboardPage() {
         skuId: item.skuObject.id,
         totalProduced: item.totalProduced,
         fill: CHART_COLORS[index % CHART_COLORS.length],
-        skuObject: item.skuObject // Importante para o clique
+        skuObject: item.skuObject
       }));
   }, [allProductionOrders, findSkuById]);
 
@@ -136,11 +134,9 @@ export default function DashboardPage() {
   }, [filteredProductionOrders, findSkuById]);
 
   const avgProductionTimePerSkuData = useMemo(() => {
-    // Para este gráfico, faz sentido usar as OPs filtradas se um SKU estiver selecionado,
-    // ou todas as OPs se nenhum SKU estiver selecionado (para mostrar o top 5 geral).
     const sourcePOs = selectedSkuFilter
-      ? filteredProductionOrders // Se um SKU está filtrado, mostramos apenas ele (ou nada se não tiver dados)
-      : allProductionOrders;    // Se nenhum SKU filtrado, mostramos o top 5 geral
+      ? filteredProductionOrders
+      : allProductionOrders;
 
     const completedPOs = sourcePOs.filter(
       (po) => po.status === 'Concluída' && po.productionTime && po.productionTime > 0
@@ -167,8 +163,8 @@ export default function DashboardPage() {
         };
       })
       .filter(item => item.avgTimeSeconds > 0)
-      .sort((a, b) => b.poCount - a.poCount) // Ordenar por contagem de OPs para mostrar os mais frequentes
-      .slice(0, selectedSkuFilter ? 1 : 5); // Se SKU filtrado, mostrar só ele, senão top 5
+      .sort((a, b) => b.poCount - a.poCount)
+      .slice(0, selectedSkuFilter ? 1 : 5);
 
     return skusWithAvgTime.map((item, index) => ({
       skuCode: item.skuCode,
@@ -179,9 +175,9 @@ export default function DashboardPage() {
   }, [selectedSkuFilter, filteredProductionOrders, allProductionOrders, findSkuById]);
 
   const metaVsRealizadoOPData = useMemo(() => {
-    const relevantPOs = filteredProductionOrders // Usa OPs filtradas
+    const relevantPOs = filteredProductionOrders
       .filter(po => po.status === 'Concluída' || po.status === 'Em Progresso')
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => (b.createdAt && a.createdAt) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0)
       .slice(0, 7);
 
     return relevantPOs.map(po => {
@@ -219,16 +215,16 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Total de SKUs" value={<span className="text-primary">{totalSKUs}</span>} icon={Package} description="Número de SKUs cadastrados" />
         <MetricCard title="Ordens Abertas/Em Progresso" value={<span className="text-primary">{totalOpenOrInProgressPOs}</span>} icon={Factory} description={`Ordens pendentes ou em execução ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
         <MetricCard title="Ordens Concluídas" value={<span className="text-primary">{completedPOsCount}</span>} icon={CheckCircle2} description={`Ordens de produção finalizadas ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
-        <MetricCard title="Tempo Médio de Produção" value={<span className="text-primary">{avgProductionTimeOverall}</span>} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} />
+        <MetricCard title="Tempo Médio de Produção (Geral)" value={<span className="text-primary">{avgProductionTimeOverall}</span>} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} />
       </div>
 
       <div className="flex items-center justify-start gap-4 mb-0 -mt-2">
         <Select onValueChange={handleSkuSelectChange} value={selectedSkuFilter?.id || "all"}>
-          <SelectTrigger className="w-[280px] h-9">
+          <SelectTrigger className="w-full sm:w-[280px] h-9">
             <div className="flex items-center">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Filtrar por SKU..." />
@@ -250,17 +246,13 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <ProductionChart
-          productionOrders={filteredProductionOrders}
-          demands={selectedSkuFilter ? filteredDemands : allDemands} // Passa demandas filtradas ou todas
-          selectedSku={selectedSkuFilter}
-        />
+        <ProductionChart />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <DemandFulfillmentCard
-          demands={allDemands} // Passa todas as demandas, o filtro de SKU será aplicado dentro do card
-          productionOrders={allProductionOrders} // Passa todas as OPs
+          demands={allDemands}
+          productionOrders={allProductionOrders}
           selectedSku={selectedSkuFilter}
         />
         <Card>
@@ -299,7 +291,7 @@ export default function DashboardPage() {
       </div>
 
 
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
