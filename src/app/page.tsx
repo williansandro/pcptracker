@@ -5,9 +5,10 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp } from 'lucide-react';
-import { useMemo } from 'react';
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp, FilterX, LayersIcon } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   ChartContainer,
   ChartTooltip,
@@ -42,26 +43,41 @@ interface CompletedPoDetails extends ProductionOrder {
 }
 
 export default function DashboardPage() {
-  const { skus, productionOrders, findSkuById } = useAppContext();
+  const { skus, productionOrders: allProductionOrders, demands: allDemands, findSkuById } = useAppContext();
+  const [selectedSkuFilter, setSelectedSkuFilter] = useState<SKU | null>(null);
+
+  const filteredProductionOrders = useMemo(() => {
+    if (!selectedSkuFilter) return allProductionOrders;
+    return allProductionOrders.filter(po => po.skuId === selectedSkuFilter.id);
+  }, [allProductionOrders, selectedSkuFilter]);
+
+  const filteredDemands = useMemo(() => {
+    if (!selectedSkuFilter) return allDemands;
+    // Nota: Demandas são inerentemente ligadas a um SKU, então se um SKU é filtrado,
+    // só precisamos das demandas daquele SKU. No entanto, DemandFulfillmentCard
+    // já lida com a filtragem por mês, então aqui só filtramos por SKU se necessário.
+    return allDemands.filter(d => d.skuId === selectedSkuFilter.id);
+  }, [allDemands, selectedSkuFilter]);
+
 
   const totalSKUs = useMemo(() => skus.length, [skus]);
 
-  const openPOsCount = useMemo(() => productionOrders.filter(po => po.status === 'Aberta').length, [productionOrders]);
-  const inProgressPOsCount = useMemo(() => productionOrders.filter(po => po.status === 'Em Progresso').length, [productionOrders]);
+  const openPOsCount = useMemo(() => filteredProductionOrders.filter(po => po.status === 'Aberta').length, [filteredProductionOrders]);
+  const inProgressPOsCount = useMemo(() => filteredProductionOrders.filter(po => po.status === 'Em Progresso').length, [filteredProductionOrders]);
   const totalOpenOrInProgressPOs = openPOsCount + inProgressPOsCount;
 
-  const completedPOsCount = useMemo(() => productionOrders.filter(po => po.status === 'Concluída').length, [productionOrders]);
+  const completedPOsCount = useMemo(() => filteredProductionOrders.filter(po => po.status === 'Concluída').length, [filteredProductionOrders]);
 
   const avgProductionTimeOverall = useMemo(() => {
-    const completedWithTime = productionOrders.filter(po => po.status === 'Concluída' && po.productionTime && po.productionTime > 0);
+    const completedWithTime = filteredProductionOrders.filter(po => po.status === 'Concluída' && po.productionTime && po.productionTime > 0);
     if (completedWithTime.length === 0) return 'N/D';
     const totalTimeSeconds = completedWithTime.reduce((sum, po) => sum + (po.productionTime || 0), 0);
     const avgTimeSeconds = totalTimeSeconds / completedWithTime.length;
     return formatDuration(avgTimeSeconds);
-  }, [productionOrders]);
+  }, [filteredProductionOrders]);
 
   const productionOrderStatusData = useMemo(() => {
-    const statusCounts = productionOrders.reduce((acc, po) => {
+    const statusCounts = filteredProductionOrders.reduce((acc, po) => {
       acc[po.status] = (acc[po.status] || 0) + 1;
       return acc;
     }, {} as Record<ProductionOrderStatus, number>);
@@ -71,28 +87,39 @@ export default function DashboardPage() {
       value: statusCounts[status],
       fill: STATUS_COLORS[status] || "hsl(var(--muted))",
     })).filter(item => item.value > 0);
-  }, [productionOrders]);
+  }, [filteredProductionOrders]);
 
+  // Para o gráfico de Top SKUs, usamos allProductionOrders porque o propósito é selecionar um SKU para filtrar.
+  // O filtro não deve afetar a fonte de seleção do filtro.
   const topSkusByProducedQuantityData = useMemo(() => {
-    const skuProduction: Record<string, number> = {};
-    productionOrders.forEach(po => {
+    const skuProduction: Record<string, { totalProduced: number; skuObject: SKU }> = {};
+    allProductionOrders.forEach(po => {
       if (po.status === 'Concluída' && po.producedQuantity && po.producedQuantity > 0) {
         const sku = findSkuById(po.skuId);
         if (sku) {
-          skuProduction[sku.code] = (skuProduction[sku.code] || 0) + po.producedQuantity;
+          if (!skuProduction[sku.id]) {
+            skuProduction[sku.id] = { totalProduced: 0, skuObject: sku };
+          }
+          skuProduction[sku.id].totalProduced += po.producedQuantity;
         }
       }
     });
 
-    return Object.entries(skuProduction)
-      .map(([skuCode, totalProduced]) => ({ skuCode, totalProduced }))
+    return Object.values(skuProduction)
       .sort((a, b) => b.totalProduced - a.totalProduced)
       .slice(0, 5)
-      .map((item, index) => ({ ...item, fill: CHART_COLORS[index % CHART_COLORS.length] }));
-  }, [productionOrders, findSkuById]);
+      .map((item, index) => ({ 
+        skuCode: item.skuObject.code, 
+        skuId: item.skuObject.id,
+        totalProduced: item.totalProduced,
+        fill: CHART_COLORS[index % CHART_COLORS.length],
+        skuObject: item.skuObject 
+      }));
+  }, [allProductionOrders, findSkuById]);
+
 
   const completedPoDetails = useMemo(() => {
-    return productionOrders
+    return filteredProductionOrders
       .filter(po => po.status === 'Concluída')
       .map(po => {
         const sku = findSkuById(po.skuId);
@@ -107,10 +134,10 @@ export default function DashboardPage() {
         };
       })
       .sort((a, b) => (b.endTime && a.endTime) ? new Date(b.endTime).getTime() - new Date(a.endTime).getTime() : 0);
-  }, [productionOrders, findSkuById]);
+  }, [filteredProductionOrders, findSkuById]);
 
   const avgProductionTimePerSkuData = useMemo(() => {
-    const completedPOs = productionOrders.filter(
+    const completedPOs = filteredProductionOrders.filter(
       (po) => po.status === 'Concluída' && po.productionTime && po.productionTime > 0
     );
 
@@ -135,8 +162,8 @@ export default function DashboardPage() {
         };
       })
       .filter(item => item.avgTimeSeconds > 0)
-      .sort((a, b) => b.poCount - a.poCount) // Prioritize by PO count to show most frequent
-      .slice(0, 5); // Take top 5 by PO count
+      .sort((a, b) => b.poCount - a.poCount) 
+      .slice(0, 5); 
 
     return skusWithAvgTime.map((item, index) => ({
       skuCode: item.skuCode,
@@ -144,10 +171,10 @@ export default function DashboardPage() {
       avgTimeSeconds: item.avgTimeSeconds,
       fill: CHART_COLORS[index % CHART_COLORS.length],
     }));
-  }, [productionOrders, findSkuById]);
+  }, [filteredProductionOrders, findSkuById]);
 
   const metaVsRealizadoOPData = useMemo(() => {
-    const relevantPOs = productionOrders
+    const relevantPOs = filteredProductionOrders
       .filter(po => po.status === 'Concluída' || po.status === 'Em Progresso')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) 
       .slice(0, 7); 
@@ -155,34 +182,63 @@ export default function DashboardPage() {
     return relevantPOs.map(po => {
       const sku = findSkuById(po.skuId);
       return {
-        name: `OP ${po.id.substring(0, 4)} - ${sku?.code || 'N/D'}`,
+        name: `OP ${po.id.substring(0, 4)}... - ${sku?.code || 'N/D'}`,
         meta: po.targetQuantity,
         realizado: po.producedQuantity || 0, 
       };
     }).reverse(); 
-  }, [productionOrders, findSkuById]);
+  }, [filteredProductionOrders, findSkuById]);
 
+  const handleSkuBarClick = (data: any) => {
+    if (data && data.activePayload && data.activePayload.length > 0) {
+      const clickedSkuObject = data.activePayload[0].payload.skuObject as SKU;
+      if (clickedSkuObject) {
+        setSelectedSkuFilter(clickedSkuObject);
+      }
+    }
+  };
+  
+  const handleClearFilter = () => {
+    setSelectedSkuFilter(null);
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" className="metric-card-purple" />
-        <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description="Ordens pendentes ou em execução" className="metric-card-blue"/>
-        <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description="Ordens de produção finalizadas" className="metric-card-orange"/>
-        <MetricCard title="Tempo Médio de Produção (Geral)" value={avgProductionTimeOverall} icon={Clock3} description="Tempo médio por ordem concluída" className="metric-card-teal"/>
+        <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description={`Ordens pendentes ou em execução ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} className="metric-card-blue"/>
+        <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description={`Ordens de produção finalizadas ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} className="metric-card-orange"/>
+        <MetricCard title="Tempo Médio de Produção" value={avgProductionTimeOverall} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} className="metric-card-teal"/>
       </div>
 
+      {selectedSkuFilter && (
+        <div className="flex items-center justify-start mb-0 -mt-2">
+          <Button onClick={handleClearFilter} variant="outline" size="sm">
+            <FilterX className="mr-2 h-4 w-4" />
+            Limpar Filtro de SKU: {selectedSkuFilter.code}
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4">
-        <ProductionChart />
+        <ProductionChart 
+          productionOrders={filteredProductionOrders} 
+          demands={selectedSkuFilter ? filteredDemands : allDemands} // Pass demands considering the filter
+          selectedSku={selectedSkuFilter}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <DemandFulfillmentCard />
+        <DemandFulfillmentCard 
+          demands={selectedSkuFilter ? filteredDemands : allDemands} 
+          productionOrders={filteredProductionOrders} 
+          selectedSku={selectedSkuFilter}
+        />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
-              Meta vs. Realizado por OP
+              Meta vs. Realizado por OP {selectedSkuFilter ? `(${selectedSkuFilter.code})` : ''}
             </CardTitle>
             <CardDescription>Comparativo de Quantidade Alvo e Produzida para OPs recentes.</CardDescription>
           </CardHeader>
@@ -206,7 +262,7 @@ export default function DashboardPage() {
                 </RechartsResponsiveContainer>
               </ChartContainer>
             ) : (
-              <p className="text-center text-muted-foreground py-10">Nenhuma OP "Em Progresso" ou "Concluída" para exibir.</p>
+              <p className="text-center text-muted-foreground py-10">Nenhuma OP {selectedSkuFilter ? `para ${selectedSkuFilter.code} ` : ''}"Em Progresso" ou "Concluída" para exibir.</p>
             )}
           </CardContent>
         </Card>
@@ -218,7 +274,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieChartIcon className="h-5 w-5 text-primary" />
-              Distribuição de Status das OPs
+              Distribuição de Status das OPs {selectedSkuFilter ? `(${selectedSkuFilter.code})` : ''}
             </CardTitle>
             <CardDescription>Visão geral dos status das ordens de produção.</CardDescription>
           </CardHeader>
@@ -260,7 +316,7 @@ export default function DashboardPage() {
                 </RechartsResponsiveContainer>
               </ChartContainer>
             ) : (
-              <p className="text-center text-muted-foreground py-10">Nenhuma ordem de produção para exibir status.</p>
+              <p className="text-center text-muted-foreground py-10">Nenhuma ordem de produção {selectedSkuFilter ? `para ${selectedSkuFilter.code} ` : ''}para exibir status.</p>
             )}
           </CardContent>
         </Card>
@@ -277,7 +333,7 @@ export default function DashboardPage() {
             {topSkusByProducedQuantityData.length > 0 ? (
               <ChartContainer config={{}} className="aspect-video max-h-[300px]">
                  <RechartsResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20, left: 10, bottom: 5 }}>
+                  <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20, left: 10, bottom: 5 }} onClick={handleSkuBarClick}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis dataKey="skuCode" type="category" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} width={80} interval={0} />
@@ -286,7 +342,7 @@ export default function DashboardPage() {
                         contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                         formatter={(value: number) => [value.toLocaleString('pt-BR') + ' un.', 'Produzido']}
                     />
-                    <Bar dataKey="totalProduced" radius={[0, 4, 4, 0]}>
+                    <Bar dataKey="totalProduced" radius={[0, 4, 4, 0]} className="cursor-pointer">
                        {topSkusByProducedQuantityData.map((entry) => (
                         <Cell key={`cell-${entry.skuCode}`} fill={entry.fill} />
                       ))}
@@ -304,7 +360,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TimerIcon className="h-5 w-5 text-primary" />
-              Tempo Médio de Produção por SKU
+              Tempo Médio de Produção por SKU {selectedSkuFilter ? `(${selectedSkuFilter.code})` : ''}
             </CardTitle>
             <CardDescription>Top 5 SKUs com mais OPs concluídas e seus tempos médios.</CardDescription>
           </CardHeader>
@@ -350,7 +406,7 @@ export default function DashboardPage() {
                 </RechartsResponsiveContainer>
               </ChartContainer>
             ) : (
-              <p className="text-center text-muted-foreground py-10">Dados insuficientes para exibir tempo médio por SKU.</p>
+              <p className="text-center text-muted-foreground py-10">Dados insuficientes para exibir tempo médio por SKU {selectedSkuFilter ? `para ${selectedSkuFilter.code}` : ''}.</p>
             )}
           </CardContent>
         </Card>
@@ -361,7 +417,7 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ListChecks className="h-5 w-5 text-primary" />
-            Detalhes de Ordens Concluídas
+            Detalhes de Ordens Concluídas {selectedSkuFilter ? `(${selectedSkuFilter.code})` : ''}
           </CardTitle>
           <CardDescription>Lista de OPs finalizadas com tempos e eficiência unitária.</CardDescription>
         </CardHeader>
@@ -406,7 +462,7 @@ export default function DashboardPage() {
               </Table>
             </div>
           ) : (
-            <p className="text-center text-muted-foreground py-10">Nenhuma ordem de produção concluída para exibir.</p>
+            <p className="text-center text-muted-foreground py-10">Nenhuma ordem de produção concluída {selectedSkuFilter ? `para ${selectedSkuFilter.code} ` : ''}para exibir.</p>
           )}
         </CardContent>
       </Card>
