@@ -16,29 +16,23 @@ import { MainNav } from './main-nav';
 import { SiteHeader } from './site-header';
 import { APP_NAME } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, PanelLeft, Menu as MenuIcon } from 'lucide-react'; // LogOut, PanelLeft, MenuIcon adicionados
-import { useAuth } from '@/contexts/auth-context'; 
+import { Settings, PanelLeft, Menu as MenuIcon } from 'lucide-react'; // LogOut foi removido daqui, pois o logout está no SiteHeader
+import { useAuth } from '@/contexts/auth-context';
 
-interface AppShellProps {
+interface AppShellInternalProps {
   children: React.ReactNode;
 }
 
-export function AppShell({ children }: AppShellProps) {
-  const { currentUser, logout } = useAuth(); 
-  const sidebar = useSidebar(); // Hook para obter o estado da sidebar
-
-  // Não renderiza o AppShell se não houver usuário logado
-  // A lógica de redirecionamento está no ProtectedLayout
-  if (!currentUser) {
-    return null; 
-  }
+// Componente interno que usa o contexto da sidebar
+function AppShellInternal({ children }: AppShellInternalProps) {
+  const sidebar = useSidebar(); // Agora é chamado dentro do escopo do SidebarProvider
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <Sidebar 
-        side="left" 
+    <>
+      <Sidebar
+        side="left"
         variant="sidebar"
-        collapsible="icon" 
+        collapsible="icon"
         className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       >
         <SidebarHeader className="p-4 border-b border-sidebar-border flex items-center justify-between h-16">
@@ -52,10 +46,6 @@ export function AppShell({ children }: AppShellProps) {
               {APP_NAME}
             </h1>
           </div>
-          {/* 
-            A classe group-data-[collapsible=icon]:hidden foi removida.
-            O ícone agora é condicional baseado no estado da sidebar.
-          */}
           <SidebarTrigger className="data-[mobile=true]:hidden">
             {sidebar?.state === 'expanded' ? <PanelLeft /> : <MenuIcon />}
           </SidebarTrigger>
@@ -64,9 +54,7 @@ export function AppShell({ children }: AppShellProps) {
           <MainNav />
         </SidebarContent>
         <SidebarFooter className="p-2 border-t border-sidebar-border">
-           {/* O botão de Configurações agora está no Dropdown do Avatar no SiteHeader */}
-           {/* Podemos remover ou deixar aqui se fizer sentido ter em ambos os lugares */}
-           <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+          <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
             <Settings className="h-5 w-5" />
             <span className="group-data-[collapsible=icon]:hidden ml-2">Configurações</span>
           </Button>
@@ -78,8 +66,25 @@ export function AppShell({ children }: AppShellProps) {
           {children}
         </main>
       </SidebarInset>
-    </SidebarProvider>
+    </>
   );
 }
 
-    
+interface AppShellProps {
+  children: React.ReactNode;
+}
+
+export function AppShell({ children }: AppShellProps) {
+  const { currentUser } = useAuth();
+
+  // ProtectedLayout já deve garantir que currentUser exista, mas esta é uma verificação de segurança adicional.
+  if (!currentUser) {
+    return null;
+  }
+
+  return (
+    <SidebarProvider defaultOpen={true}>
+      <AppShellInternal>{children}</AppShellInternal>
+    </SidebarProvider>
+  );
+}
