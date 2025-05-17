@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { AppShell } from '@/components/layout/app-shell'; // AppShell é usado aqui
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
@@ -29,10 +30,13 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
     );
   }
 
-  if (!currentUser && pathname !== '/login') {
-    // Ainda pode estar no processo de redirecionamento pelo useEffect
-    // ou pode ser o render inicial antes do useEffect executar.
-    // Mostrar um loader para evitar piscar o conteúdo indevido.
+  // Se não estiver autenticado E estiver na página de login, renderiza a página de login (children) diretamente
+  if (!currentUser && pathname === '/login') {
+    return <>{children}</>;
+  }
+
+  // Se não estiver autenticado E NÃO estiver na página de login (deve ter sido pego pelo redirect, mas como fallback)
+  if (!currentUser) {
      return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -41,8 +45,11 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
     );
   }
 
-  // Se estiver na página de login e já autenticado, o useEffect em login/page.tsx deve redirecionar.
-  // Se não estiver autenticado, a página de login será renderizada (se for a rota /login).
-  // Se estiver autenticado e não for /login, renderiza os children.
-  return <>{children}</>;
+  // Se estiver autenticado, renderiza AppShell com o conteúdo da página (children)
+  // O AppShell internamente verificará currentUser novamente, mas neste ponto, ele deve existir.
+  return (
+    <AppShell>
+      {children}
+    </AppShell>
+  );
 }

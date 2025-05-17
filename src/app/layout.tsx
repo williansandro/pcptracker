@@ -4,9 +4,9 @@ import { Inter as FontSans } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { AppContextProvider } from '@/contexts/app-context';
-import { AuthContextProvider } from '@/contexts/auth-context'; // Adicionado
-import { ProtectedLayout } from '@/components/layout/protected-layout'; // Adicionado
-import { AppShell } from '@/components/layout/app-shell';
+import { AuthContextProvider } from '@/contexts/auth-context';
+import { ProtectedLayout } from '@/components/layout/protected-layout';
+// AppShell não é mais importado ou usado diretamente aqui
 import { Toaster } from "@/components/ui/toaster";
 import { APP_NAME } from '@/lib/constants';
 
@@ -36,11 +36,9 @@ export default function RootLayout({
         <AuthContextProvider>
           <AppContextProvider>
             <ProtectedLayout>
-              <AppShell>
-                {children}
-              </AppShell>
-              <Toaster />
+              {children} {/* ProtectedLayout agora gerencia o AppShell internamente */}
             </ProtectedLayout>
+            <Toaster />
           </AppContextProvider>
         </AuthContextProvider>
       </body>
