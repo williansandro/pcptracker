@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAppContext } from "@/contexts/app-context";
@@ -5,7 +6,7 @@ import { PoDataTable } from "@/components/production-orders/po-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ProductionOrdersPage() {
-  const { productionOrders } = useAppContext();
+  const { productionOrders, skus, findSkuById } = useAppContext();
 
   return (
     <div className="container mx-auto py-10">
@@ -17,7 +18,7 @@ export default function ProductionOrdersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <PoDataTable data={productionOrders} />
+          <PoDataTable data={productionOrders} skus={skus} findSkuById={findSkuById} />
         </CardContent>
       </Card>
     </div>

@@ -9,11 +9,9 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  type ColumnDef,
   type SortingState,
   type VisibilityState,
   type ColumnFiltersState,
-  type Row,
 } from "@tanstack/react-table";
 
 import {
@@ -24,13 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DataTablePagination } from "@/components/data-table-pagination";
 import { PoFormDialog } from "./po-form-dialog";
 import { useAppContext } from "@/contexts/app-context";
 import { getPoColumns } from "./po-columns";
-import type { ProductionOrder } from "@/types";
+import type { ProductionOrder, SKU } from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,47 +37,60 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-interface PoDataTableProps<TData, TValue> {
+interface PoDataTableProps<TData extends ProductionOrder, TValue> {
   data: TData[];
+  skus: SKU[];
+  findSkuById: (skuId: string) => SKU | undefined;
 }
 
 export function PoDataTable<TData extends ProductionOrder, TValue>({
   data,
+  skus,
+  findSkuById,
 }: PoDataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
+  const [skuFilter, setSkuFilter] = React.useState<string>("all");
 
-  const { findSkuById, skus, deleteSelectedProductionOrders } = useAppContext();
+  const { deleteSelectedProductionOrders } = useAppContext();
   const { toast } = useToast();
 
   const columns = React.useMemo(
     () => getPoColumns(findSkuById),
-    [findSkuById, skus] 
+    [findSkuById]
   );
 
+  const sortedSkus = React.useMemo(() =>
+    [...skus].sort((a, b) => a.code.localeCompare(b.code)),
+  [skus]);
+
+  const filteredData = React.useMemo(() => {
+    if (skuFilter === "all") {
+      return data;
+    }
+    return data.filter(po => po.skuId === skuFilter);
+  }, [data, skuFilter]);
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: getFilteredRowModel(), // Mantido para outros filtros, se adicionados
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     state: {
       sorting,
-      columnFilters,
       columnVisibility,
       rowSelection,
     },
@@ -110,14 +120,20 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Input
-          placeholder="Filtrar OPs por SKU..."
-          value={(table.getColumn("skuId")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("skuId")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        />
+        <Select onValueChange={setSkuFilter} value={skuFilter}>
+          <SelectTrigger className="w-[280px] h-10">
+            <div className="flex items-center">
+              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Filtrar por SKU..." />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os SKUs</SelectItem>
+            {sortedSkus.map(s => (
+              <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex items-center space-x-2">
           {selectedRows.length > 0 && (
             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
@@ -172,11 +188,14 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row, index) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="border-b-border hover:bg-muted/30"
+                  className={cn(
+                    "border-b-border hover:bg-muted/30",
+                    index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
+                  )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-3">
@@ -194,7 +213,7 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Nenhuma Ordem de Produção encontrada.
+                  Nenhuma Ordem de Produção encontrada {skuFilter !== "all" ? `para o SKU selecionado` : ''}.
                 </TableCell>
               </TableRow>
             )}
