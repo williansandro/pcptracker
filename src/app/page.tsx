@@ -5,18 +5,21 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp } from 'lucide-react';
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp, LayersIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
 } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClientSideDateTime } from "@/components/client-side-date-time";
 import { formatDuration, cn } from "@/lib/utils";
 import { ptBR } from 'date-fns/locale';
+import { format, subMonths, startOfMonth } from 'date-fns';
 import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
 
@@ -26,6 +29,14 @@ const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
   Concluída: "hsl(var(--chart-2))",
   Cancelada: "hsl(var(--chart-5))",
 };
+
+const CHART_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+];
 
 interface CompletedPoDetails extends ProductionOrder {
   skuCode: string;
@@ -80,7 +91,7 @@ export default function DashboardPage() {
       .map(([skuCode, totalProduced]) => ({ skuCode, totalProduced }))
       .sort((a, b) => b.totalProduced - a.totalProduced)
       .slice(0, 5)
-      .map((item, index) => ({ ...item, fill: `hsl(var(--chart-${(index % 5) + 1}))` }));
+      .map((item, index) => ({ ...item, fill: CHART_COLORS[index % CHART_COLORS.length] }));
   }, [productionOrders, findSkuById]);
 
   const completedPoDetails = useMemo(() => {
@@ -127,31 +138,68 @@ export default function DashboardPage() {
         };
       })
       .filter(item => item.avgTimeSeconds > 0)
-      .sort((a, b) => b.poCount - a.poCount)
-      .slice(0, 5);
+      .sort((a, b) => b.poCount - a.poCount) // Prioritize by PO count to show most frequent
+      .slice(0, 5); // Take top 5 by PO count
 
     return skusWithAvgTime.map((item, index) => ({
       skuCode: item.skuCode,
       avgTimeFormatted: formatDuration(item.avgTimeSeconds),
       avgTimeSeconds: item.avgTimeSeconds,
-      fill: `hsl(var(--chart-${(index % 5) + 1}))`,
+      fill: CHART_COLORS[index % CHART_COLORS.length],
     }));
   }, [productionOrders, findSkuById]);
 
   const metaVsRealizadoOPData = useMemo(() => {
     const relevantPOs = productionOrders
       .filter(po => po.status === 'Concluída' || po.status === 'Em Progresso')
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) // Mais recentes primeiro
-      .slice(0, 7); // Pegar as 7 OPs mais recentes
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) 
+      .slice(0, 7); 
 
     return relevantPOs.map(po => {
       const sku = findSkuById(po.skuId);
       return {
         name: `OP ${po.id.substring(0, 4)} - ${sku?.code || 'N/D'}`,
         meta: po.targetQuantity,
-        realizado: po.producedQuantity || 0, // Default to 0 if not produced yet
+        realizado: po.producedQuantity || 0, 
       };
-    }).reverse(); // Reverter para mostrar as mais antigas primeiro no gráfico (da esquerda para a direita)
+    }).reverse(); 
+  }, [productionOrders, findSkuById]);
+
+  const { data: monthlySkuProductionData, producedSkuCodes, chartConfig } = useMemo(() => {
+    const today = new Date();
+    const lastSixMonthsDates = Array.from({ length: 6 }).map((_, i) => {
+      return startOfMonth(subMonths(today, 5 - i));
+    });
+
+    const allProducedSkuCodes = new Set<string>();
+    const data = lastSixMonthsDates.map(monthDate => {
+      const monthYearStr = format(monthDate, 'yyyy-MM');
+      const monthName = format(monthDate, "MMM", { locale: ptBR });
+      
+      const productionsThisMonth: { month: string; [skuCode: string]: number | string } = { month: monthName };
+
+      productionOrders.forEach(po => {
+        if (po.status === 'Concluída' && po.endTime?.startsWith(monthYearStr) && po.producedQuantity && po.producedQuantity > 0) {
+          const sku = findSkuById(po.skuId);
+          if (sku) {
+            allProducedSkuCodes.add(sku.code);
+            productionsThisMonth[sku.code] = (productionsThisMonth[sku.code] as number || 0) + po.producedQuantity;
+          }
+        }
+      });
+      return productionsThisMonth;
+    });
+
+    const codes = Array.from(allProducedSkuCodes).sort();
+    const config: { [key: string]: { label: string; color: string } } = {};
+    codes.forEach((code, index) => {
+      config[code] = {
+        label: code,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      };
+    });
+
+    return { data, producedSkuCodes: codes, chartConfig: config };
   }, [productionOrders, findSkuById]);
 
 
@@ -167,6 +215,39 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4">
         <ProductionChart />
       </div>
+
+      {monthlySkuProductionData.length > 0 && producedSkuCodes.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LayersIcon className="h-5 w-5 text-primary" />
+              Produção Mensal por SKU
+            </CardTitle>
+            <CardDescription>Quantidades produzidas de cada SKU nos últimos 6 meses.</CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <ChartContainer config={chartConfig} className="aspect-video max-h-[400px]">
+              <RechartsResponsiveContainer width="100%" height={400}>
+                <BarChart data={monthlySkuProductionData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="month" stroke="hsl(var(--foreground))" fontSize={12}/>
+                  <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${value} un.`} />
+                  <RechartsTooltip
+                    cursor={{ fill: 'hsl(var(--muted))' }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                    formatter={(value: number, name: string) => [value.toLocaleString('pt-BR') + ' un.', name]}
+                  />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  {producedSkuCodes.map((skuCode) => (
+                    <Bar key={skuCode} dataKey={skuCode} stackId="a" fill={`var(--color-${skuCode})`} name={skuCode} radius={[4,4,0,0]} barSize={30} />
+                  ))}
+                </BarChart>
+              </RechartsResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      )}
+
 
       <div className="grid gap-4 md:grid-cols-2">
         <DemandFulfillmentCard />
@@ -267,9 +348,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {topSkusByProducedQuantityData.length > 0 ? (
-              <ChartContainer config={{}} className="aspect-video max-h-[300px]">
+              <ChartContainer config={{
+                data: topSkusByProducedQuantityData.reduce((acc, cur) => ({...acc, [cur.skuCode]: {label: cur.skuCode, color: cur.fill}}), {})
+              }} className="aspect-video max-h-[300px]">
                  <RechartsResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20, left: 10 }}>
+                  <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis dataKey="skuCode" type="category" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} width={80} interval={0} />
                     <RechartsTooltip
@@ -278,8 +362,8 @@ export default function DashboardPage() {
                         formatter={(value: number) => [value.toLocaleString('pt-BR') + ' un.', 'Produzido']}
                     />
                     <Bar dataKey="totalProduced" radius={[0, 4, 4, 0]}>
-                       {topSkusByProducedQuantityData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                       {topSkusByProducedQuantityData.map((entry) => (
+                        <Cell key={`cell-${entry.skuCode}`} fill={`var(--color-${entry.skuCode})`} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -301,9 +385,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {avgProductionTimePerSkuData.length > 0 ? (
-              <ChartContainer config={{}} className="aspect-video max-h-[300px]">
+               <ChartContainer config={
+                avgProductionTimePerSkuData.reduce((acc, cur) => ({...acc, [cur.skuCode]: {label: cur.skuCode, color: cur.fill}}), {})
+              } className="aspect-video max-h-[300px]">
                 <RechartsResponsiveContainer width="100%" height={300}>
-                  <BarChart data={avgProductionTimePerSkuData} layout="vertical" margin={{ right: 30, left: 20 }}>
+                  <BarChart data={avgProductionTimePerSkuData} layout="vertical" margin={{ right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis
                       type="number"
                       dataKey="avgTimeSeconds"
@@ -332,8 +419,8 @@ export default function DashboardPage() {
                         }}
                     />
                     <Bar dataKey="avgTimeSeconds" name="Tempo Médio" radius={[0, 4, 4, 0]}>
-                      {avgProductionTimePerSkuData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      {avgProductionTimePerSkuData.map((entry) => (
+                        <Cell key={`cell-${entry.skuCode}`} fill={`var(--color-${entry.skuCode})`} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -403,3 +490,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
