@@ -23,10 +23,10 @@ import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
-  Aberta: "hsl(var(--chart-3))",
-  "Em Progresso": "hsl(var(--chart-4))",
-  Concluída: "hsl(var(--chart-2))",
-  Cancelada: "hsl(var(--chart-5))",
+  Aberta: "hsl(var(--chart-3))", // Orange
+  "Em Progresso": "hsl(var(--chart-4))", // Green
+  Concluída: "hsl(var(--chart-2))", // Purple
+  Cancelada: "hsl(var(--chart-5))", // Pink/Magenta
 };
 
 const CHART_COLORS = [
@@ -90,7 +90,6 @@ export default function DashboardPage() {
 
   const topSkusByProducedQuantityData = useMemo(() => {
     const skuProduction: Record<string, { totalProduced: number; skuObject: SKU }> = {};
-    // Este gráfico sempre mostra todos os SKUs, independentemente do filtro, para permitir a seleção.
     allProductionOrders.forEach(po => {
       if (po.status === 'Concluída' && po.producedQuantity && po.producedQuantity > 0) {
         const sku = findSkuById(po.skuId);
@@ -106,12 +105,12 @@ export default function DashboardPage() {
     return Object.values(skuProduction)
       .sort((a, b) => b.totalProduced - a.totalProduced)
       .slice(0, 5)
-      .map((item, index) => ({ 
-        skuCode: item.skuObject.code, 
+      .map((item, index) => ({
+        skuCode: item.skuObject.code,
         skuId: item.skuObject.id,
         totalProduced: item.totalProduced,
         fill: CHART_COLORS[index % CHART_COLORS.length],
-        skuObject: item.skuObject 
+        skuObject: item.skuObject
       }));
   }, [allProductionOrders, findSkuById]);
 
@@ -160,8 +159,8 @@ export default function DashboardPage() {
         };
       })
       .filter(item => item.avgTimeSeconds > 0)
-      .sort((a, b) => b.poCount - a.poCount) 
-      .slice(0, 5); 
+      .sort((a, b) => b.poCount - a.poCount)
+      .slice(0, 5);
 
     return skusWithAvgTime.map((item, index) => ({
       skuCode: item.skuCode,
@@ -174,17 +173,17 @@ export default function DashboardPage() {
   const metaVsRealizadoOPData = useMemo(() => {
     const relevantPOs = filteredProductionOrders
       .filter(po => po.status === 'Concluída' || po.status === 'Em Progresso')
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) 
-      .slice(0, 7); 
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 7);
 
     return relevantPOs.map(po => {
       const sku = findSkuById(po.skuId);
       return {
         name: `OP ${po.id.substring(0, 4)}... - ${sku?.code || 'N/D'}`,
         meta: po.targetQuantity,
-        realizado: po.producedQuantity || 0, 
+        realizado: po.producedQuantity || 0,
       };
-    }).reverse(); 
+    }).reverse();
   }, [filteredProductionOrders, findSkuById]);
 
   const handleSkuBarClick = (data: any) => {
@@ -195,7 +194,7 @@ export default function DashboardPage() {
       }
     }
   };
-  
+
   const handleClearFilter = () => {
     setSelectedSkuFilter(null);
   };
@@ -213,10 +212,10 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" className="metric-card-purple" />
-        <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description={`Ordens pendentes ou em execução ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} className="metric-card-blue"/>
-        <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description={`Ordens de produção finalizadas ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} className="metric-card-orange"/>
-        <MetricCard title="Tempo Médio de Produção (Geral)" value={avgProductionTimeOverall} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} className="metric-card-teal"/>
+        <MetricCard title="Total de SKUs" value={<span className="text-primary">{totalSKUs}</span>} icon={Package} description="Número de SKUs cadastrados" />
+        <MetricCard title="Ordens Abertas/Em Progresso" value={<span className="text-primary">{totalOpenOrInProgressPOs}</span>} icon={Factory} description={`Ordens pendentes ou em execução ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
+        <MetricCard title="Ordens Concluídas" value={<span className="text-primary">{completedPOsCount}</span>} icon={CheckCircle2} description={`Ordens de produção finalizadas ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
+        <MetricCard title="Tempo Médio de Produção (Geral)" value={<span className="text-primary">{avgProductionTimeOverall}</span>} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} />
       </div>
 
       <div className="flex items-center justify-start gap-4 mb-0 -mt-2">
@@ -243,17 +242,17 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <ProductionChart 
-          productionOrders={filteredProductionOrders} 
-          demands={selectedSkuFilter ? filteredDemands : allDemands} 
+        <ProductionChart
+          productionOrders={filteredProductionOrders}
+          demands={selectedSkuFilter ? filteredDemands : allDemands}
           selectedSku={selectedSkuFilter}
         />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <DemandFulfillmentCard 
-          demands={selectedSkuFilter ? filteredDemands : allDemands} 
-          productionOrders={filteredProductionOrders} 
+        <DemandFulfillmentCard
+          demands={selectedSkuFilter ? filteredDemands : allDemands}
+          productionOrders={filteredProductionOrders}
           selectedSku={selectedSkuFilter}
         />
         <Card>
@@ -269,15 +268,16 @@ export default function DashboardPage() {
               <ChartContainer config={{}} className="aspect-video max-h-[300px]">
                 <RechartsResponsiveContainer width="100%" height={300}>
                   <BarChart data={metaVsRealizadoOPData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={10} interval={0} angle={-30} textAnchor="end" height={60} />
                     <YAxis stroke="hsl(var(--foreground))" fontSize={12} />
                     <RechartsTooltip
                       cursor={{ fill: 'hsl(var(--muted))' }}
-                      contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--card-foreground))' }}
+                      itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                       formatter={(value: number, name: string) => [value.toLocaleString('pt-BR') + ' un.', name.charAt(0).toUpperCase() + name.slice(1)]}
                     />
-                    <RechartsLegend wrapperStyle={{ fontSize: '12px' }} />
+                    <RechartsLegend wrapperStyle={{ fontSize: '12px', color: 'hsl(var(--foreground))' }} />
                     <Bar dataKey="meta" name="Meta" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={20} />
                     <Bar dataKey="realizado" name="Realizado" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={20} />
                   </BarChart>
@@ -308,6 +308,8 @@ export default function DashboardPage() {
                     <RechartsTooltip
                       cursor={{ fill: "hsl(var(--muted))" }}
                       content={<ChartTooltipContent hideLabel />}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--card-foreground))' }}
+                      itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                     />
                     <Pie
                       data={productionOrderStatusData}
@@ -323,17 +325,17 @@ export default function DashboardPage() {
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
                         return (percent * 100) > 5 ? (
-                          <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                          <text x={x} y={y} fill="hsl(var(--background))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontWeight="bold">
                             {`${(percent * 100).toFixed(0)}%`}
                           </text>
                         ) : null;
                       }}
                     >
                       {productionOrderStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                        <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--card))" />
                       ))}
                     </Pie>
-                    <RechartsLegend />
+                    <RechartsLegend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
                   </PieChart>
                 </RechartsResponsiveContainer>
               </ChartContainer>
@@ -356,12 +358,13 @@ export default function DashboardPage() {
               <ChartContainer config={{}} className="aspect-video max-h-[300px]">
                  <RechartsResponsiveContainer width="100%" height={300}>
                   <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20, left: 10, bottom: 5 }} onClick={handleSkuBarClick}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                     <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis dataKey="skuCode" type="category" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} width={80} interval={0} />
                     <RechartsTooltip
                         cursor={{ fill: 'hsl(var(--muted))' }}
-                        contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--card-foreground))' }}
+                        itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                         formatter={(value: number) => [value.toLocaleString('pt-BR') + ' un.', 'Produzido']}
                     />
                     <Bar dataKey="totalProduced" radius={[0, 4, 4, 0]} className="cursor-pointer">
@@ -391,7 +394,7 @@ export default function DashboardPage() {
                <ChartContainer config={{}} className="aspect-video max-h-[300px]">
                 <RechartsResponsiveContainer width="100%" height={300}>
                   <BarChart data={avgProductionTimePerSkuData} layout="vertical" margin={{ right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                     <XAxis
                       type="number"
                       dataKey="avgTimeSeconds"
@@ -413,7 +416,8 @@ export default function DashboardPage() {
                     />
                     <RechartsTooltip
                         cursor={{ fill: 'hsl(var(--muted))' }}
-                        contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--card-foreground))' }}
+                        itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                         formatter={(value: number, name: string, props: any) => {
                            if (name === "avgTimeSeconds") return [props.payload.avgTimeFormatted, "Tempo Médio"];
                            return [value, name];
@@ -437,7 +441,7 @@ export default function DashboardPage() {
 
       <Card className="lg:col-span-3">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-foreground/90">
             <ListChecks className="h-5 w-5 text-primary" />
             Detalhes de Ordens Concluídas {selectedSkuFilter ? `(${selectedSkuFilter.code})` : ''}
           </CardTitle>
@@ -450,34 +454,38 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>SKU</TableHead>
+                    <TableHead className="text-center">Meta</TableHead>
+                    <TableHead className="text-center">Qtd. Prod.</TableHead>
                     <TableHead className="text-center">Início</TableHead>
                     <TableHead className="text-center">Fim</TableHead>
-                    <TableHead className="text-center">Tempo Total</TableHead>
-                    <TableHead className="text-right">Qtd. Prod.</TableHead>
+                    {/* <TableHead className="text-center">Pausa</TableHead> Remoção solicitada implicitamente pela imagem */}
+                    <TableHead className="text-center">Tempo Líquido</TableHead>
                     <TableHead className="text-right">Seg/Unid.</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {completedPoDetails.map((po, index) => (
+                  {completedPoDetails.map((po) => (
                     <TableRow
                       key={po.id}
-                      className={cn(
-                        index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
-                      )}
+                      className="border-b-border hover:bg-muted/30"
                     >
                       <TableCell>
-                        <div className="font-medium">{po.skuCode}</div>
+                        <div className="font-medium text-primary">{po.skuCode}</div>
                         <div className="text-xs text-muted-foreground truncate max-w-[200px]">{po.skuDescription}</div>
                       </TableCell>
+                      <TableCell className="text-center">{po.targetQuantity.toLocaleString('pt-BR')} Un</TableCell>
+                      <TableCell className="text-center">{po.producedQuantity?.toLocaleString('pt-BR') || '-'} Un</TableCell>
                       <TableCell className="text-center">
-                        <ClientSideDateTime dateString={po.startTime} outputFormat="dd/MM HH:mm" locale={ptBR} placeholder="-" />
+                        <ClientSideDateTime dateString={po.startTime} outputFormat="dd/MM/yyyy, HH:mm:ss" locale={ptBR} placeholder="-" />
                       </TableCell>
                       <TableCell className="text-center">
-                        <ClientSideDateTime dateString={po.endTime} outputFormat="dd/MM HH:mm" locale={ptBR} placeholder="-" />
+                        <ClientSideDateTime dateString={po.endTime} outputFormat="dd/MM/yyyy, HH:mm:ss" locale={ptBR} placeholder="-" />
                       </TableCell>
+                      {/* <TableCell className="text-center">Não</TableCell>  Remoção solicitada implicitamente pela imagem */}
                       <TableCell className="text-center">{formatDuration(po.productionTime)}</TableCell>
-                      <TableCell className="text-right">{po.producedQuantity?.toLocaleString('pt-BR') || '-'}</TableCell>
-                      <TableCell className="text-right">{po.secondsPerUnit}</TableCell>
+                      <TableCell className={cn("text-right font-semibold", po.secondsPerUnit !== 'N/D' ? 'text-accent' : 'text-muted-foreground')}>
+                        {po.secondsPerUnit}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -43,8 +43,9 @@ import {
 import { Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { SkuInlineForm } from "./sku-inline-form";
 
-interface DataTableProps<TData, TValue> {
+interface DataTableProps<TData extends SKU, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
 }
@@ -87,7 +88,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
     const idsToDelete = selectedRows.map(row => row.original.id);
     try {
       const result = deleteSelectedSkus(idsToDelete);
-      
+
       let toastTitle = "Resultado da Exclusão";
       const descriptions: string[] = [];
 
@@ -105,7 +106,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
           toastTitle = "Falha ao Excluir SKUs";
         }
       }
-      
+
       if (descriptions.length > 0) {
         toast({
           title: toastTitle,
@@ -169,7 +170,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
               </AlertDialogContent>
             </AlertDialog>
           )}
-          <SkuFormDialog />
+          {/* O botão de adicionar é agora o formulário inline, não mais um SkuFormDialog aqui */}
         </div>
       </div>
       <div className="rounded-md border">
@@ -179,7 +180,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="py-3">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -194,16 +195,14 @@ export function SkuDataTable<TData extends SKU, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row, index) => (
+              table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={cn(
-                    index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
-                  )}
+                  className="border-b-border hover:bg-muted/30"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="py-3">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -229,4 +228,3 @@ export function SkuDataTable<TData extends SKU, TValue>({
     </div>
   );
 }
-

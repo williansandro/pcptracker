@@ -63,8 +63,8 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
   const { toast } = useToast();
 
   const columns = React.useMemo(
-    () => getPoColumns(findSkuById) as ColumnDef<TData, TValue>[],
-    [findSkuById, skus] // skus is a dependency if findSkuById uses it, which it does from context
+    () => getPoColumns(findSkuById),
+    [findSkuById, skus] 
   );
 
   const table = useReactTable({
@@ -157,7 +157,7 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="py-3">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -172,16 +172,14 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row, index) => (
+              table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={cn(
-                    index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
-                  )}
+                  className="border-b-border hover:bg-muted/30"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="py-3">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -207,4 +205,3 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
     </div>
   );
 }
-

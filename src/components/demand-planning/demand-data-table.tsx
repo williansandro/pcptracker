@@ -63,7 +63,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
   const { toast } = useToast();
 
   const columns = React.useMemo(
-    () => getDemandColumns(findSkuById, getProductionOrdersBySku) as ColumnDef<TData, TValue>[],
+    () => getDemandColumns(findSkuById, getProductionOrdersBySku),
     [findSkuById, getProductionOrdersBySku, skus, productionOrders]
   );
 
@@ -157,7 +157,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="py-3">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -172,16 +172,14 @@ export function DemandDataTable<TData extends Demand, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row, index) => (
+              table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={cn(
-                    index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
-                  )}
+                  className="border-b-border hover:bg-muted/30"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="py-3">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -207,4 +205,3 @@ export function DemandDataTable<TData extends Demand, TValue>({
     </div>
   );
 }
-

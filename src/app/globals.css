@@ -5,99 +5,57 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%; /* Very light cool gray */
-    --foreground: 240 10% 15%; /* Dark text */
+    /* Dark Theme as Default */
+    --background: 220 40% 5%; /* Deep Dark Blue */
+    --foreground: 210 20% 95%; /* Light Gray / Off-white */
 
-    --muted: 240 5% 94%;
-    --muted-foreground: 240 5% 45%;
+    --muted: 220 30% 15%; /* Darker Muted Blue */
+    --muted-foreground: 210 15% 65%; /* Lighter Gray for muted text */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 15%;
+    --popover: 220 35% 7%; /* Slightly lighter dark blue for popovers */
+    --popover-foreground: 210 20% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 15%;
+    --card: 220 30% 9%; /* Dark Blue for cards, slightly off from background */
+    --card-foreground: 210 20% 95%;
 
-    --border: 240 5% 90%;
-    --input: 0 0% 100%;
-    /* --input-border: 240 5% 85%; Consider adding if default --border isn't enough for inputs */
+    --border: 220 25% 18%; /* Subtle border color */
+    --input: 220 25% 12%; /* Input background */
 
-    --primary: 260 70% 60%; /* Berry Purple */
-    --primary-foreground: 0 0% 100%; /* White text on purple */
+    --primary: 205 90% 60%; /* Bright Cyan/Light Blue for primary actions & SKU text */
+    --primary-foreground: 220 40% 5%; /* Dark text on primary (if needed, usually primary is text color) */
 
-    --secondary: 240 5% 90%; /* Subtle secondary elements */
-    --secondary-foreground: 240 5% 30%;
+    --secondary: 220 20% 20%; /* Secondary elements background */
+    --secondary-foreground: 210 15% 75%;
 
-    --accent: 210 85% 55%; /* Berry Blue */
-    --accent-foreground: 0 0% 100%; /* White text on blue */
+    --accent: 145 65% 55%; /* Vibrant Green for Seg/Unidade & other accents */
+    --accent-foreground: 220 40% 5%; /* Dark text on accent */
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 70% 55%; /* Red for destructive actions */
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 210 85% 55%; /* Berry Blue for focus rings */
+    --ring: 205 90% 65%; /* Ring color for focus, matches primary */
     --radius: 0.5rem;
 
-    --chart-1: 260 70% 60%; /* Purple */
-    --chart-2: 210 85% 55%; /* Blue */
-    --chart-3: 260 70% 75%; /* Lighter Purple */
-    --chart-4: 210 85% 70%; /* Lighter Blue */
-    --chart-5: 30 80% 65%;   /* Orange/Yellow accent */
+    --chart-1: 205 80% 55%; /* Cyan/Blue */
+    --chart-2: 260 80% 65%; /* Purple */
+    --chart-3: 30 90% 60%;  /* Orange */
+    --chart-4: 145 70% 50%; /* Green */
+    --chart-5: 350 85% 65%; /* Pink/Magenta */
 
-    /* Sidebar specific theme variables */
-    --sidebar-background: 0 0% 100%; /* White sidebar */
-    --sidebar-foreground: 240 10% 15%;
-    --sidebar-primary: 260 70% 60%; /* Purple for text/icons in sidebar if needed directly */
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 260 70% 95%; /* Very light purple for active item background */
-    --sidebar-accent-foreground: 260 70% 50%; /* Purple text on light purple active item */
-    --sidebar-border: 240 5% 90%;
-    --sidebar-ring: 210 85% 55%;
+    /* Sidebar specific theme variables for dark theme */
+    --sidebar-background: 220 35% 7%; /* Darker than main bg for contrast or same as popover */
+    --sidebar-foreground: 210 15% 80%;
+    --sidebar-primary: 205 90% 60%; /* Primary text/icons in sidebar */
+    --sidebar-primary-foreground: 210 20% 95%;
+    --sidebar-accent: 220 40% 12%; /* Accent for active item background (subtle) */
+    --sidebar-accent-foreground: 205 90% 70%; /* Active item text color (brighter primary) */
+    --sidebar-border: 220 25% 15%;
+    --sidebar-ring: 205 90% 65%;
   }
 
   .dark {
-    /* Keeping dark mode similar to original, but can be adjusted to match Berry's dark if one exists */
-    --background: 235 20% 12%;
-    --foreground: 0 0% 95%;
-
-    --muted: 235 20% 20%;
-    --muted-foreground: 0 0% 65%;
-
-    --popover: 235 20% 10%;
-    --popover-foreground: 0 0% 95%;
-
-    --card: 235 20% 10%;
-    --card-foreground: 0 0% 95%;
-
-    --border: 235 20% 25%;
-    --input: 235 20% 25%;
-
-    --primary: 260 70% 65%; /* Lighter Purple for dark mode */
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 235 20% 30%;
-    --secondary-foreground: 0 0% 95%;
-
-    --accent: 210 85% 60%; /* Brighter Blue for dark mode */
-    --accent-foreground: 235 20% 10%;
-
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
-
-    --ring: 210 85% 60%;
-
-    --chart-1: 260 70% 70%;
-    --chart-2: 210 85% 65%;
-    --chart-3: 260 70% 80%;
-    --chart-4: 210 85% 75%;
-    --chart-5: 30 80% 70%;
-
-    --sidebar-background: 235 15% 15%; /* Darker for sidebar in dark mode */
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 260 70% 65%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 260 70% 25%; /* Darker, muted purple for active item background */
-    --sidebar-accent-foreground: 260 70% 75%; /* Lighter purple text for active item */
-    --sidebar-border: 235 20% 25%;
-    --sidebar-ring: 210 85% 60%;
+    /* This block can be removed if dark is the only theme, or used for a light theme override if needed later */
+    /* For now, :root defines the dark theme */
   }
 }
 
@@ -110,53 +68,27 @@
   }
 }
 
-/* Custom Progress Bar Colors */
+/* Custom Progress Bar Colors - Ensure they work on dark bg */
 @layer components {
   .progress-bar-red > div {
-    @apply bg-red-500; /* Tailwind red */
+    @apply bg-red-500;
   }
   .progress-bar-yellow > div {
-    @apply bg-yellow-500; /* Tailwind yellow */
+    @apply bg-yellow-400; /* Brighter yellow for dark theme */
   }
   .progress-bar-green > div {
-    @apply bg-green-500; /* Tailwind green */
+    @apply bg-green-500;
   }
   .progress-bar-blue > div {
-    @apply bg-blue-500; /* Tailwind blue, can be changed to theme accent if preferred */
-    /* For Berry blue accent: @apply bg-accent; */
+    @apply bg-blue-500;
   }
 
-  /* Colored Metric Cards */
-  .metric-card-purple {
-    @apply bg-gradient-to-br from-purple-500 to-indigo-600 text-primary-foreground;
-    /* Using Tailwind direct colors for gradient as HSL var might be complex for gradient definition here */
-    /* Fallback: @apply bg-primary text-primary-foreground; */
-  }
-  .metric-card-purple .text-muted-foreground {
-    @apply text-primary-foreground/80;
-  }
-
-  .metric-card-blue {
-     @apply bg-gradient-to-br from-sky-500 to-blue-600 text-accent-foreground;
-    /* Fallback: @apply bg-accent text-accent-foreground; */
-  }
-  .metric-card-blue .text-muted-foreground {
-    @apply text-accent-foreground/80;
-  }
-
-  .metric-card-orange {
-    @apply bg-gradient-to-br from-orange-400 to-red-500 text-white;
-    /* Fallback: @apply bg-orange-500 text-white; */
-  }
-  .metric-card-orange .text-muted-foreground {
-    @apply text-white/80;
-  }
-
-  .metric-card-teal {
-    @apply bg-gradient-to-br from-teal-400 to-cyan-600 text-white;
-    /* Fallback: @apply bg-teal-600 text-white; */
-  }
-  .metric-card-teal .text-muted-foreground {
-    @apply text-white/80;
-  }
+  /* Colored Metric Cards - No longer used, cards will use default dark card style */
+  /* Remove or comment out if not needed */
+  /*
+  .metric-card-purple { ... }
+  .metric-card-blue { ... }
+  .metric-card-orange { ... }
+  .metric-card-teal { ... }
+  */
 }
