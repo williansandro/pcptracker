@@ -9,26 +9,33 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarInset,
-  SidebarTrigger, // Re-enabled for desktop sidebar toggle
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { MainNav } from './main-nav';
 import { SiteHeader } from './site-header';
 import { APP_NAME } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
-import { Menu } from 'lucide-react'; // For mobile header trigger
+import { Settings, LogOut } from 'lucide-react'; // LogOut adicionado
+import { useAuth } from '@/contexts/auth-context'; // Adicionado
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
-  // defaultOpen is true for desktop, managed by cookie. Mobile is handled by Sheet in SiteHeader.
+  const { currentUser, logout } = useAuth(); // Adicionado
+
+  // Não renderiza o AppShell se não houver usuário logado
+  // A lógica de redirecionamento está no ProtectedLayout
+  if (!currentUser) {
+    return null; 
+  }
+
   return (
     <SidebarProvider defaultOpen={true}>
       <Sidebar 
         side="left" 
-        variant="sidebar" // Use 'sidebar' for a solid sidebar, 'inset' could also work
+        variant="sidebar"
         collapsible="icon" 
         className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       >
@@ -43,19 +50,21 @@ export function AppShell({ children }: AppShellProps) {
               {APP_NAME}
             </h1>
           </div>
-          <SidebarTrigger className="group-data-[collapsible=icon]:hidden data-[mobile=true]:hidden" /> {/* Hidden on mobile, shown on desktop */}
+          <SidebarTrigger className="group-data-[collapsible=icon]:hidden data-[mobile=true]:hidden" />
         </SidebarHeader>
         <SidebarContent className="p-2">
           <MainNav />
         </SidebarContent>
         <SidebarFooter className="p-2 border-t border-sidebar-border">
+           {/* O botão de Configurações agora está no Dropdown do Avatar no SiteHeader */}
+           {/* Podemos remover ou deixar aqui se fizer sentido ter em ambos os lugares */}
            <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
             <Settings className="h-5 w-5" />
             <span className="group-data-[collapsible=icon]:hidden ml-2">Configurações</span>
           </Button>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="flex flex-col min-h-screen bg-background"> {/* Ensure main content has the correct background */}
+      <SidebarInset className="flex flex-col min-h-screen bg-background">
         <SiteHeader />
         <main className="flex-1 p-4 md:p-6 lg:p-8">
           {children}

@@ -3,21 +3,26 @@ import { APP_NAME } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
-import { Menu, Search, SlidersHorizontal, Bell, Settings } from 'lucide-react';
+import { Menu, Search, LogOut, Bell, Settings, UserCircle } from 'lucide-react'; // LogOut adicionado, Settings mantido
 import { MainNav } from './main-nav';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from '@/contexts/auth-context'; // Adicionado
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function SiteHeader() {
+  const { currentUser, logout } = useAuth(); // Adicionado
+
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card supports-[backdrop-filter]:bg-card/80 backdrop-blur">
       <div className="container flex h-16 items-center px-4 md:px-6">
-        {/* App Name for Desktop (now part of sidebar trigger) - this part removed as sidebar contains name */}
-        {/* <div className="mr-4 hidden md:flex">
-          <span className="font-bold text-lg">{APP_NAME}</span>
-        </div> */}
-
-        {/* Mobile Menu & App Name */}
         <div className="flex items-center md:hidden">
            <Sheet>
             <SheetTrigger asChild>
@@ -40,7 +45,6 @@ export function SiteHeader() {
               <MainNav />
             </SheetContent>
           </Sheet>
-          {/* App Name on mobile, next to hamburger */}
            <div className="flex items-center gap-2 md:hidden">
              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary">
                 <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
@@ -51,7 +55,6 @@ export function SiteHeader() {
           </div>
         </div>
         
-        {/* Search Bar - Hidden on mobile, shown on md+ */}
         <div className="hidden md:flex flex-1 items-center justify-center px-4 lg:px-8">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -60,27 +63,53 @@ export function SiteHeader() {
               placeholder="Pesquisar..."
               className="h-9 w-full rounded-md bg-background pl-10 pr-4 border-border focus:border-primary"
             />
-            {/* Placeholder for filter button next to search bar */}
-            {/* <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2">
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-            </Button> */}
           </div>
         </div>
         
         <div className="flex flex-1 items-center justify-end space-x-2">
-          {/* Placeholder Action Icons */}
           <Button variant="ghost" size="icon" className="h-9 w-9">
             <Bell className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
             <span className="sr-only">Notificações</span>
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9">
-            <Settings className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
-            <span className="sr-only">Configurações</span>
-          </Button>
-          <Avatar className="h-9 w-9">
-            <AvatarImage src="https://placehold.co/40x40.png" alt="Usuário" data-ai-hint="user avatar" />
-            <AvatarFallback>PCP</AvatarFallback>
-          </Avatar>
+          
+          {currentUser ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                  <Avatar className="h-9 w-9">
+                    {/* Você pode adicionar uma imagem de avatar do usuário aqui se tiver */}
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {currentUser.email?.[0]?.toUpperCase() || <UserCircle size={20}/>}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">Minha Conta</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {currentUser.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Configurações</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+             <Button variant="ghost" size="sm" onClick={() => {/* Idealmente redirecionaria para /login, mas ProtectedLayout já faz isso */}}>
+              Entrar
+            </Button>
+          )}
         </div>
       </div>
     </header>
