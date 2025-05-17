@@ -5,7 +5,7 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks } from 'lucide-react';
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -44,14 +44,12 @@ export default function DashboardPage() {
 
   const completedPOsCount = useMemo(() => productionOrders.filter(po => po.status === 'Concluída').length, [productionOrders]);
 
-  const avgProductionTime = useMemo(() => {
+  const avgProductionTimeOverall = useMemo(() => {
     const completedWithTime = productionOrders.filter(po => po.status === 'Concluída' && po.productionTime && po.productionTime > 0);
     if (completedWithTime.length === 0) return 'N/D';
     const totalTimeSeconds = completedWithTime.reduce((sum, po) => sum + (po.productionTime || 0), 0);
     const avgTimeSeconds = totalTimeSeconds / completedWithTime.length;
-    const hours = Math.floor(avgTimeSeconds / 3600);
-    const minutes = Math.floor((avgTimeSeconds % 3600) / 60);
-    return `${hours > 0 ? `${hours}h ` : ''}${minutes}m`;
+    return formatDuration(avgTimeSeconds);
   }, [productionOrders]);
 
   const productionOrderStatusData = useMemo(() => {
@@ -82,7 +80,7 @@ export default function DashboardPage() {
       .map(([skuCode, totalProduced]) => ({ skuCode, totalProduced }))
       .sort((a, b) => b.totalProduced - a.totalProduced)
       .slice(0, 5)
-      .map((item, index) => ({ ...item, fill: `hsl(var(--chart-${index + 1}))` }));
+      .map((item, index) => ({ ...item, fill: `hsl(var(--chart-${(index % 5) + 1}))` }));
   }, [productionOrders, findSkuById]);
 
   const completedPoDetails = useMemo(() => {
@@ -100,7 +98,44 @@ export default function DashboardPage() {
           secondsPerUnit,
         };
       })
-      .sort((a, b) => new Date(b.endTime || 0).getTime() - new Date(a.endTime || 0).getTime()); // Mais recentes primeiro
+      .sort((a, b) => (b.endTime && a.endTime) ? new Date(b.endTime).getTime() - new Date(a.endTime).getTime() : 0); // Mais recentes primeiro
+  }, [productionOrders, findSkuById]);
+
+  const avgProductionTimePerSkuData = useMemo(() => {
+    const completedPOs = productionOrders.filter(
+      (po) => po.status === 'Concluída' && po.productionTime && po.productionTime > 0
+    );
+
+    const skuProductionStats: Record<string, { totalTime: number; count: number }> = {};
+
+    completedPOs.forEach((po) => {
+      if (!skuProductionStats[po.skuId]) {
+        skuProductionStats[po.skuId] = { totalTime: 0, count: 0 };
+      }
+      skuProductionStats[po.skuId].totalTime += po.productionTime!;
+      skuProductionStats[po.skuId].count += 1;
+    });
+
+    const skusWithAvgTime = Object.entries(skuProductionStats)
+      .map(([skuId, stats]) => {
+        const sku = findSkuById(skuId);
+        return {
+          skuId,
+          skuCode: sku ? sku.code : 'Desconhecido',
+          avgTimeSeconds: stats.count > 0 ? stats.totalTime / stats.count : 0,
+          poCount: stats.count,
+        };
+      })
+      .filter(item => item.avgTimeSeconds > 0)
+      .sort((a, b) => b.poCount - a.poCount) // Prioriza SKUs com mais OPs concluídas
+      .slice(0, 5); // Pega o top 5
+
+    return skusWithAvgTime.map((item, index) => ({
+      skuCode: item.skuCode,
+      avgTimeFormatted: formatDuration(item.avgTimeSeconds),
+      avgTimeSeconds: item.avgTimeSeconds, // para o eixo X do gráfico
+      fill: `hsl(var(--chart-${(index % 5) + 1}))`,
+    }));
   }, [productionOrders, findSkuById]);
 
 
@@ -110,7 +145,7 @@ export default function DashboardPage() {
         <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" className="metric-card-purple" />
         <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description="Ordens pendentes ou em execução" className="metric-card-blue"/>
         <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description="Ordens de produção finalizadas" className="metric-card-orange"/>
-        <MetricCard title="Tempo Médio de Produção" value={avgProductionTime} icon={Clock3} description="Tempo médio por ordem concluída" className="metric-card-teal"/>
+        <MetricCard title="Tempo Médio de Produção (Geral)" value={avgProductionTimeOverall} icon={Clock3} description="Tempo médio por ordem concluída" className="metric-card-teal"/>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -118,14 +153,14 @@ export default function DashboardPage() {
         <DemandFulfillmentCard />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieChartIcon className="h-5 w-5 text-primary" />
               Distribuição de Status das OPs
             </CardTitle>
-            <CardDescription>Visão geral dos status das ordens de produção atuais.</CardDescription>
+            <CardDescription>Visão geral dos status das ordens de produção.</CardDescription>
           </CardHeader>
           <CardContent>
             {productionOrderStatusData.length > 0 ? (
@@ -144,7 +179,7 @@ export default function DashboardPage() {
                       cy="50%"
                       outerRadius={100}
                       labelLine={false}
-                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
                         const RADIAN = Math.PI / 180;
                         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -174,17 +209,17 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChartIcon className="h-5 w-5 text-primary" />
-              Top 5 SKUs por Quantidade Produzida
+              Top 5 SKUs por Qtd. Produzida
             </CardTitle>
-            <CardDescription>SKUs com maior volume de produção (ordens concluídas).</CardDescription>
+            <CardDescription>SKUs com maior volume de produção (OPs concluídas).</CardDescription>
           </CardHeader>
           <CardContent>
             {topSkusByProducedQuantityData.length > 0 ? (
               <ChartContainer config={{}} className="aspect-video max-h-[300px]">
                  <RechartsResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20 }}>
+                  <BarChart data={topSkusByProducedQuantityData} layout="vertical" margin={{ right: 20, left: 10 }}>
                     <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis dataKey="skuCode" type="category" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis dataKey="skuCode" type="category" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} width={80} interval={0} />
                     <RechartsTooltip
                         cursor={{ fill: 'hsl(var(--muted))' }}
                         contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
@@ -199,13 +234,68 @@ export default function DashboardPage() {
                 </RechartsResponsiveContainer>
               </ChartContainer>
             ) : (
-               <p className="text-center text-muted-foreground py-10">Nenhuma produção concluída para exibir o top SKUs.</p>
+               <p className="text-center text-muted-foreground py-10">Nenhuma produção concluída para exibir.</p>
             )}
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TimerIcon className="h-5 w-5 text-primary" />
+              Tempo Médio de Produção por SKU
+            </CardTitle>
+            <CardDescription>Top 5 SKUs com mais OPs concluídas e seus tempos médios.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {avgProductionTimePerSkuData.length > 0 ? (
+              <ChartContainer config={{}} className="aspect-video max-h-[300px]">
+                <RechartsResponsiveContainer width="100%" height={300}>
+                  <BarChart data={avgProductionTimePerSkuData} layout="vertical" margin={{ right: 30, left: 20 }}>
+                    <XAxis 
+                      type="number" 
+                      dataKey="avgTimeSeconds" 
+                      stroke="hsl(var(--foreground))" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value) => formatDuration(value)} 
+                    />
+                    <YAxis 
+                      dataKey="skuCode" 
+                      type="category" 
+                      stroke="hsl(var(--foreground))" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      width={80} 
+                      interval={0}
+                    />
+                    <RechartsTooltip
+                        cursor={{ fill: 'hsl(var(--muted))' }}
+                        contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                        formatter={(value: number, name: string, props: any) => {
+                           if (name === "avgTimeSeconds") return [props.payload.avgTimeFormatted, "Tempo Médio"];
+                           return [value, name];
+                        }}
+                    />
+                    <Bar dataKey="avgTimeSeconds" name="Tempo Médio" radius={[0, 4, 4, 0]}>
+                      {avgProductionTimePerSkuData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </RechartsResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="text-center text-muted-foreground py-10">Dados insuficientes para exibir tempo médio por SKU.</p>
+            )}
+          </CardContent>
+        </Card>
+
       </div>
 
-      <Card className="lg:col-span-2">
+      <Card className="lg:col-span-3"> {/* Ajustado para ocupar toda a largura na nova configuração de grid dos charts */}
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ListChecks className="h-5 w-5 text-primary" />
