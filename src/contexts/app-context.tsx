@@ -25,6 +25,7 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/auth-context'; // Importar useAuth
 
 const SKUS_COLLECTION = 'skus';
 const PRODUCTION_ORDERS_COLLECTION = 'productionOrders';
@@ -39,7 +40,7 @@ interface DeleteSelectedSkusResult {
 interface AppContextType {
   skus: SKU[];
   addSku: (skuData: Omit<SKU, 'id' | 'createdAt'>) => Promise<void>;
-  updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => Promise<void>;
+  updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt' | 'unitOfMeasure'>>) => Promise<void>;
   deleteSku: (skuId: string) => Promise<void>;
   deleteSelectedSkus: (skuIds: string[]) => Promise<DeleteSelectedSkusResult>;
   findSkuById: (skuId: string) => SKU | undefined;
@@ -71,6 +72,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [demands, setDemands] = useState<Demand[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
+  const { currentUser, loading: authLoading } = useAuth(); // Obter currentUser e authLoading
 
   useEffect(() => {
     setIsMounted(true);
@@ -80,6 +82,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     id: docData.id,
     code: docData.code,
     description: docData.description,
+    // unitOfMeasure: docData.unitOfMeasure, // Removido
     createdAt: docData.createdAt,
   } as SKU);
 
@@ -181,9 +184,16 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
   const fetchData = useCallback(async () => {
+    if (!currentUser) { // Não buscar dados se não houver usuário logado
+      console.log("FetchData: Nenhum usuário logado, não buscando dados.");
+      setSkus([]);
+      setProductionOrders([]);
+      setDemands([]);
+      return;
+    }
     try {
       console.log("Buscando dados do Firestore...");
-      const seededData = await seedDatabase();
+      const seededData = await seedDatabase(); // O seedDatabase deve ser chamado antes de buscar os dados
 
       if (seededData) { 
         setSkus(seededData.skus.map(mapDocToSku));
@@ -221,16 +231,25 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setProductionOrders([]);
       setDemands([]);
     }
-  }, [toast, seedDatabase]); 
+  }, [toast, seedDatabase, currentUser]); // Adicionado currentUser à dependência
 
   useEffect(() => {
-    if (!isMounted) return;
-    fetchData();
-  }, [isMounted, fetchData]);
+    if (isMounted && !authLoading) {
+      if (currentUser) {
+        console.log("Usuário autenticado, buscando dados...");
+        fetchData();
+      } else {
+        console.log("Nenhum usuário autenticado, limpando dados...");
+        setSkus([]);
+        setProductionOrders([]);
+        setDemands([]);
+      }
+    }
+  }, [isMounted, authLoading, currentUser, fetchData]);
 
 
   // Gerenciamento de SKU
-  const addSku = useCallback(async (skuData: Omit<SKU, 'id' | 'createdAt'>) => {
+  const addSku = useCallback(async (skuData: Omit<SKU, 'id' | 'createdAt' | 'unitOfMeasure'>) => {
     const newSkuId = uuidv4();
     const newSku: SKU = { ...skuData, id: newSkuId, createdAt: new Date().toISOString() };
     try {
@@ -243,16 +262,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         description: `Não foi possível adicionar o SKU. ${error.message}`,
         variant: "destructive",
       });
-      throw error; // Relançar o erro para que o formulário possa tratá-lo
+      throw error; 
     }
   }, [toast]);
 
-  const updateSku = useCallback(async (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => {
+  const updateSku = useCallback(async (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt' | 'unitOfMeasure'>>) => {
     try {
       const skuRef = doc(db, SKUS_COLLECTION, skuId);
       await updateDoc(skuRef, skuData);
       setSkus(prev => prev.map(s => s.id === skuId ? { ...s, ...skuData, code: skuData.code || s.code, description: skuData.description || s.description } as SKU : s));
-      toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || skus.find(s=>s.id === skuId)?.code} atualizado.`});
+      const currentSku = skus.find(s => s.id === skuId);
+      toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || currentSku?.code} atualizado.`});
     } catch (error: any)      {
       const firebaseError = error as { code?: string };
       if (firebaseError.code === 'not-found') {
@@ -272,7 +292,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
     }
-  }, [toast, skus]);
+  }, [toast, skus]); // Adicionado skus à dependência
 
   const deleteSku = useCallback(async (skuId: string) => {
     const skuToDelete = skus.find(s => s.id === skuId);
@@ -408,12 +428,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateProductionOrder = useCallback(async (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => {
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
+      // Filtrar campos undefined antes de enviar para updateDoc
       const updateData = Object.entries(poData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
           acc[key as keyof typeof poData] = value;
         }
         return acc;
-      }, {} as any); 
+      }, {} as any);
 
       if (Object.keys(updateData).length > 0) {
         await updateDoc(poRef, updateData);
@@ -468,8 +489,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const updateData = { 
       status: 'Em Progresso' as ProductionOrderStatus, 
       startTime: new Date().toISOString(), 
-      endTime: null, 
-      productionTime: null 
+      endTime: null, // Usar null em vez de undefined
+      productionTime: null // Usar null em vez de undefined
     };
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
@@ -534,12 +555,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateDemand = useCallback(async (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => {
     try {
       const demandRef = doc(db, DEMANDS_COLLECTION, demandId);
+      // Filtrar campos undefined antes de enviar para updateDoc
       const updateData = Object.entries(demandData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
           acc[key as keyof typeof demandData] = value;
         }
         return acc;
-      }, {} as any); 
+      }, {} as any);
 
       if (Object.keys(updateData).length > 0) {
         await updateDoc(demandRef, updateData);
@@ -590,13 +612,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [demands]);
 
   const contextValue = useMemo(() => ({
-    skus: isMounted ? skus : [],
+    skus, // Não condiciona mais à montagem aqui, pois o useEffect acima lida com isso
     addSku,
     updateSku,
     deleteSku,
     deleteSelectedSkus,
     findSkuById,
-    productionOrders: isMounted ? productionOrders : [],
+    productionOrders, // Não condiciona mais à montagem aqui
     addProductionOrder,
     updateProductionOrder,
     deleteProductionOrder,
@@ -605,15 +627,16 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     stopProductionOrderTimer,
     findProductionOrderById,
     getProductionOrdersBySku,
-    demands: isMounted ? demands : [],
+    demands, // Não condiciona mais à montagem aqui
     addDemand,
     updateDemand,
     deleteDemand,
     deleteSelectedDemands,
     findDemandBySkuAndMonth,
-    isDataReady: isMounted, 
+    isDataReady: isMounted && !authLoading && !!currentUser, 
   }), [
-    isMounted, skus, productionOrders, demands,
+    isMounted, authLoading, currentUser, // Adicionado authLoading e currentUser aqui também
+    skus, productionOrders, demands,
     addSku, updateSku, deleteSku, deleteSelectedSkus, findSkuById,
     addProductionOrder, updateProductionOrder, deleteProductionOrder, deleteSelectedProductionOrders, 
     startProductionOrderTimer, stopProductionOrderTimer, findProductionOrderById, getProductionOrdersBySku,
@@ -630,4 +653,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
