@@ -44,7 +44,14 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
       header: "SKU",
       cell: ({ row }) => {
         const sku = findSkuById(row.getValue("skuId"));
-        return sku ? `${sku.code} (${sku.description.substring(0,20)}...)` : "SKU não encontrado";
+        return sku ? (
+          <div>
+            <span className="text-primary font-medium">{sku.code}</span>
+            <span className="text-xs text-muted-foreground ml-1">
+              ({sku.description.substring(0,20)}{sku.description.length > 20 ? '...' : ''})
+            </span>
+          </div>
+        ) : "SKU não encontrado";
       },
     },
     {
@@ -84,16 +91,16 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
 
         if (percentage > 100) {
           progressBarClass = "progress-bar-blue";
-          textColorClass = "text-blue-600";
+          textColorClass = "text-blue-400"; // Adjusted for dark theme
         } else if (percentage >= 90) {
           progressBarClass = "progress-bar-green";
-          textColorClass = "text-green-600";
+          textColorClass = "text-green-400"; // Adjusted for dark theme
         } else if (percentage >= 70) {
           progressBarClass = "progress-bar-yellow";
-          textColorClass = "text-yellow-600";
+          textColorClass = "text-yellow-400"; // Adjusted for dark theme
         } else {
           progressBarClass = "progress-bar-red";
-          textColorClass = "text-red-600";
+          textColorClass = "text-red-400"; // Adjusted for dark theme
         }
 
         return (
@@ -120,19 +127,19 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
         switch (status) {
           case "Concluída":
             variant = "default";
-            className = "bg-green-500 hover:bg-green-600 text-white";
+            className = "bg-green-600 hover:bg-green-700 text-white"; // Adjusted for dark theme
             break;
           case "Em Progresso":
             variant = "outline";
-            className = "bg-yellow-500 hover:bg-yellow-600 text-black";
+            className = "border-yellow-500 text-yellow-400 hover:bg-yellow-500/10"; // Adjusted for dark theme
             break;
           case "Aberta":
             variant = "secondary";
-            className = "bg-blue-500 hover:bg-blue-600 text-white";
+            className = "bg-blue-600 hover:bg-blue-700 text-white"; // Adjusted for dark theme
             break;
           case "Cancelada":
             variant = "destructive";
-            className = "bg-red-500 hover:bg-red-600 text-white";
+            className = "bg-red-600 hover:bg-red-700 text-white"; // Adjusted for dark theme
             break;
           default:
             variant = "default";

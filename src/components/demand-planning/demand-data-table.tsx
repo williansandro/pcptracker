@@ -190,14 +190,11 @@ export function DemandDataTable<TData extends Demand, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row, index) => (
+              table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={cn(
-                    "border-b-border hover:bg-muted/30",
-                    index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
-                  )}
+                  className="border-b-border hover:bg-muted/30"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-3">

@@ -45,7 +45,14 @@ export const getDemandColumns = (
       header: "SKU",
       cell: ({ row }) => {
         const sku = findSkuById(row.getValue("skuId"));
-        return sku ? `${sku.code} (${sku.description.substring(0,20)}...)` : "SKU não encontrado";
+        return sku ? (
+          <div>
+            <span className="text-primary font-medium">{sku.code}</span>
+            <span className="text-xs text-muted-foreground ml-1">
+              ({sku.description.substring(0,20)}{sku.description.length > 20 ? '...' : ''})
+            </span>
+          </div>
+        ) : "SKU não encontrado";
       },
     },
     {
@@ -106,16 +113,16 @@ export const getDemandColumns = (
 
         if (progressPercentage > 100) {
           progressBarClass = "progress-bar-blue";
-          textColorClass = "text-blue-600";
+          textColorClass = "text-blue-400"; // Adjusted for dark theme
         } else if (progressPercentage >= 90) {
           progressBarClass = "progress-bar-green";
-          textColorClass = "text-green-600";
+          textColorClass = "text-green-400"; // Adjusted for dark theme
         } else if (progressPercentage >= 70) {
           progressBarClass = "progress-bar-yellow";
-          textColorClass = "text-yellow-600";
+          textColorClass = "text-yellow-400"; // Adjusted for dark theme
         } else {
           progressBarClass = "progress-bar-red";
-          textColorClass = "text-red-600";
+          textColorClass = "text-red-400"; // Adjusted for dark theme
         }
         
         return (
@@ -132,4 +139,3 @@ export const getDemandColumns = (
     },
   ];
 };
-
