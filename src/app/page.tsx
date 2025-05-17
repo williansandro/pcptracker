@@ -5,7 +5,7 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp, FilterX, LayersIcon } from 'lucide-react';
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp, FilterX, LayersIcon, Filter } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { formatDuration, cn } from "@/lib/utils";
 import { ptBR } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
   Aberta: "hsl(var(--chart-3))",
@@ -46,6 +47,8 @@ export default function DashboardPage() {
   const { skus, productionOrders: allProductionOrders, demands: allDemands, findSkuById } = useAppContext();
   const [selectedSkuFilter, setSelectedSkuFilter] = useState<SKU | null>(null);
 
+  const sortedSkus = useMemo(() => [...skus].sort((a, b) => a.code.localeCompare(b.code)), [skus]);
+
   const filteredProductionOrders = useMemo(() => {
     if (!selectedSkuFilter) return allProductionOrders;
     return allProductionOrders.filter(po => po.skuId === selectedSkuFilter.id);
@@ -53,12 +56,8 @@ export default function DashboardPage() {
 
   const filteredDemands = useMemo(() => {
     if (!selectedSkuFilter) return allDemands;
-    // Nota: Demandas são inerentemente ligadas a um SKU, então se um SKU é filtrado,
-    // só precisamos das demandas daquele SKU. No entanto, DemandFulfillmentCard
-    // já lida com a filtragem por mês, então aqui só filtramos por SKU se necessário.
     return allDemands.filter(d => d.skuId === selectedSkuFilter.id);
   }, [allDemands, selectedSkuFilter]);
-
 
   const totalSKUs = useMemo(() => skus.length, [skus]);
 
@@ -89,10 +88,9 @@ export default function DashboardPage() {
     })).filter(item => item.value > 0);
   }, [filteredProductionOrders]);
 
-  // Para o gráfico de Top SKUs, usamos allProductionOrders porque o propósito é selecionar um SKU para filtrar.
-  // O filtro não deve afetar a fonte de seleção do filtro.
   const topSkusByProducedQuantityData = useMemo(() => {
     const skuProduction: Record<string, { totalProduced: number; skuObject: SKU }> = {};
+    // Este gráfico sempre mostra todos os SKUs, independentemente do filtro, para permitir a seleção.
     allProductionOrders.forEach(po => {
       if (po.status === 'Concluída' && po.producedQuantity && po.producedQuantity > 0) {
         const sku = findSkuById(po.skuId);
@@ -202,28 +200,52 @@ export default function DashboardPage() {
     setSelectedSkuFilter(null);
   };
 
+  const handleSkuSelectChange = (skuId: string) => {
+    if (skuId === "all") {
+      setSelectedSkuFilter(null);
+    } else {
+      const sku = findSkuById(skuId);
+      setSelectedSkuFilter(sku || null);
+    }
+  };
+
+
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Total de SKUs" value={totalSKUs} icon={Package} description="Número de SKUs cadastrados" className="metric-card-purple" />
         <MetricCard title="Ordens Abertas/Em Progresso" value={totalOpenOrInProgressPOs} icon={Factory} description={`Ordens pendentes ou em execução ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} className="metric-card-blue"/>
         <MetricCard title="Ordens Concluídas" value={completedPOsCount} icon={CheckCircle2} description={`Ordens de produção finalizadas ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} className="metric-card-orange"/>
-        <MetricCard title="Tempo Médio de Produção" value={avgProductionTimeOverall} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} className="metric-card-teal"/>
+        <MetricCard title="Tempo Médio de Produção (Geral)" value={avgProductionTimeOverall} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} className="metric-card-teal"/>
       </div>
 
-      {selectedSkuFilter && (
-        <div className="flex items-center justify-start mb-0 -mt-2">
+      <div className="flex items-center justify-start gap-4 mb-0 -mt-2">
+        <Select onValueChange={handleSkuSelectChange} value={selectedSkuFilter?.id || "all"}>
+          <SelectTrigger className="w-[280px] h-9">
+            <div className="flex items-center">
+              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Filtrar por SKU..." />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os SKUs</SelectItem>
+            {sortedSkus.map(sku => (
+              <SelectItem key={sku.id} value={sku.id}>{sku.code} - {sku.description}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedSkuFilter && (
           <Button onClick={handleClearFilter} variant="outline" size="sm">
             <FilterX className="mr-2 h-4 w-4" />
-            Limpar Filtro de SKU: {selectedSkuFilter.code}
+            Limpar Filtro: {selectedSkuFilter.code}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-4">
         <ProductionChart 
           productionOrders={filteredProductionOrders} 
-          demands={selectedSkuFilter ? filteredDemands : allDemands} // Pass demands considering the filter
+          demands={selectedSkuFilter ? filteredDemands : allDemands} 
           selectedSku={selectedSkuFilter}
         />
       </div>
@@ -469,3 +491,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
