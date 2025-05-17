@@ -10,20 +10,22 @@ import {
   SidebarFooter,
   SidebarInset,
   SidebarTrigger,
+  useSidebar, // Import useSidebar
 } from '@/components/ui/sidebar';
 import { MainNav } from './main-nav';
 import { SiteHeader } from './site-header';
 import { APP_NAME } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut } from 'lucide-react'; // LogOut adicionado
-import { useAuth } from '@/contexts/auth-context'; // Adicionado
+import { Settings, LogOut, PanelLeft, Menu as MenuIcon } from 'lucide-react'; // LogOut, PanelLeft, MenuIcon adicionados
+import { useAuth } from '@/contexts/auth-context'; 
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { currentUser, logout } = useAuth(); // Adicionado
+  const { currentUser, logout } = useAuth(); 
+  const sidebar = useSidebar(); // Hook para obter o estado da sidebar
 
   // Não renderiza o AppShell se não houver usuário logado
   // A lógica de redirecionamento está no ProtectedLayout
@@ -50,7 +52,13 @@ export function AppShell({ children }: AppShellProps) {
               {APP_NAME}
             </h1>
           </div>
-          <SidebarTrigger className="group-data-[collapsible=icon]:hidden data-[mobile=true]:hidden" />
+          {/* 
+            A classe group-data-[collapsible=icon]:hidden foi removida.
+            O ícone agora é condicional baseado no estado da sidebar.
+          */}
+          <SidebarTrigger className="data-[mobile=true]:hidden">
+            {sidebar?.state === 'expanded' ? <PanelLeft /> : <MenuIcon />}
+          </SidebarTrigger>
         </SidebarHeader>
         <SidebarContent className="p-2">
           <MainNav />
@@ -73,3 +81,5 @@ export function AppShell({ children }: AppShellProps) {
     </SidebarProvider>
   );
 }
+
+    
