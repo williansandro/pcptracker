@@ -12,7 +12,7 @@ import {
   type ColumnDef,
   type SortingState,
   type VisibilityState,
-  type ColumnFiltersState,
+  type ColumnFiltersState, // Não mais usado diretamente para filtro de código via input
 } from "@tanstack/react-table";
 
 import {
@@ -23,10 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input"; // Removido
 import { Button } from "@/components/ui/button";
 import { DataTablePagination } from "@/components/data-table-pagination";
-import { SkuFormDialog } from "./sku-form-dialog";
+// SkuFormDialog não é mais usado para "Adicionar" aqui, SkuInlineForm cuida disso.
 import { useAppContext } from "@/contexts/app-context";
 import type { SKU } from "@/types";
 import {
@@ -38,16 +38,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Filter } from "lucide-react"; // Adicionado Filter
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SkuInlineForm } from "./sku-inline-form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Adicionado
 
 interface DataTableProps<TData extends SKU, TValue> {
   columns: ColumnDef<TData, TValue>[];
-  data: TData[];
+  data: TData[]; // Recebe todos os SKUs
 }
 
 export function SkuDataTable<TData extends SKU, TValue>({
@@ -55,19 +55,31 @@ export function SkuDataTable<TData extends SKU, TValue>({
   data,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  // const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]); // Não mais usado para filtro de código
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
+  const [skuFilter, setSkuFilter] = React.useState<string>("all"); // para ID do SKU ou "all"
 
   const { deleteSelectedSkus } = useAppContext();
   const { toast } = useToast();
 
+  const sortedSkusForDropdown = React.useMemo(() =>
+    [...data].sort((a, b) => a.code.localeCompare(b.code)),
+  [data]);
+
+  const filteredData = React.useMemo(() => {
+    if (skuFilter === "all") {
+      return data;
+    }
+    return data.filter(sku => sku.id === skuFilter);
+  }, [data, skuFilter]);
+
   const table = useReactTable({
-    data,
+    data: filteredData, // Usar dados filtrados
     columns,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    // onColumnFiltersChange: setColumnFilters, // Não mais usado para filtro de código
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
@@ -76,7 +88,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
     getSortedRowModel: getSortedRowModel(),
     state: {
       sorting,
-      columnFilters,
+      // columnFilters, // Não mais usado para filtro de código
       columnVisibility,
       rowSelection,
     },
@@ -133,14 +145,20 @@ export function SkuDataTable<TData extends SKU, TValue>({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Input
-          placeholder="Filtrar SKUs por código..."
-          value={(table.getColumn("code")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("code")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        />
+        <Select onValueChange={setSkuFilter} value={skuFilter}>
+          <SelectTrigger className="w-[280px] h-10">
+            <div className="flex items-center">
+              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Filtrar por SKU..." />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os SKUs</SelectItem>
+            {sortedSkusForDropdown.map(s => (
+              <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex items-center space-x-2">
           {selectedRows.length > 0 && (
             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
@@ -217,7 +235,7 @@ export function SkuDataTable<TData extends SKU, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Nenhum SKU encontrado.
+                  Nenhum SKU encontrado{skuFilter !== "all" ? " para o filtro selecionado" : ""}.
                 </TableCell>
               </TableRow>
             )}
