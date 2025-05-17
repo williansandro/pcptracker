@@ -11,12 +11,12 @@ export type ProductionOrderStatus = 'Aberta' | 'Em Progresso' | 'Concluída' | '
 export interface ProductionOrder {
   id: string;
   skuId: string;
-  targetQuantity: number; // Renomeado de quantity
-  producedQuantity?: number; // Nova propriedade
+  targetQuantity: number; 
+  producedQuantity?: number; 
   status: ProductionOrderStatus;
-  startTime?: string; // ISO Date String
-  endTime?: string; // ISO Date String
-  productionTime?: number; // em segundos
+  startTime?: string | null; // ISO Date String
+  endTime?: string | null; // ISO Date String
+  productionTime?: number | null; // em segundos
   notes?: string;
   createdAt: string; // ISO Date String
 }
@@ -29,9 +29,34 @@ export interface Demand {
   createdAt: string; // ISO Date String
 }
 
-// Para Análise de IA
+// Para Análise de IA de Produção
 export interface ProductionDataEntry {
   skuCode: string;
-  quantityProduced: number; // Mantido como quantityProduced para o input da IA
+  quantityProduced: number; 
   productionTimeMinutes: number;
 }
+
+// Para Análise de IA de Demanda
+export interface DemandDataEntry {
+  skuCode: string;
+  skuDescription: string;
+  monthYear: string;
+  targetQuantity: number;
+  producedQuantity: number;
+}
+
+export type AnalyzeDemandForecastOutput = {
+  analysis: string;
+  suggestions: string;
+};
+
+export type AnalyzeDemandForecastInput = {
+  skuCode: string;
+  skuDescription: string;
+  historicalData: {
+    monthYear: string;
+    targetQuantity: number;
+    producedQuantity: number;
+  }[];
+};
+

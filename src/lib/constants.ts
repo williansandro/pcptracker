@@ -32,7 +32,7 @@ export const DUMMY_SKUS_DATA: Omit<SKU, 'id' | 'createdAt'>[] = [
 export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'skuId'>[] = [
   {
     targetQuantity: 100,
-    producedQuantity: 95, // Exemplo: produziu um pouco menos
+    producedQuantity: 95, 
     startTime: twoHoursAgo,
     endTime: oneHourAgo,
     productionTime: 3600,
@@ -40,7 +40,6 @@ export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'created
   },
   {
     targetQuantity: 50,
-    // producedQuantity será definido quando for concluída
     startTime: thirtyMinAgo,
     notes: "Produção de cadernos em andamento."
   },
@@ -53,7 +52,7 @@ export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'created
   },
   {
     targetQuantity: 75,
-    producedQuantity: 80, // Exemplo: produziu um pouco mais
+    producedQuantity: 80, 
     startTime: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
     endTime: new Date(now.getTime() - 3 * 30 * 60 * 1000).toISOString(),
     productionTime: 1800,
@@ -69,7 +68,6 @@ export const DUMMY_DEMANDS_DATA: Omit<Demand, 'id' | 'createdAt' | 'skuId'>[] = 
   { monthYear: '2024-09', targetQuantity: 400 },
 ];
 
-// Chaves para localStorage
-export const LOCAL_STORAGE_SKUS_KEY = 'pcpTrackerSkus';
-export const LOCAL_STORAGE_PRODUCTION_ORDERS_KEY = 'pcpTrackerProductionOrders';
-export const LOCAL_STORAGE_DEMANDS_KEY = 'pcpTrackerDemands';
+// Chaves para localStorage - Não são mais usadas para dados principais, mas podem ser úteis para configurações futuras
+export const LOCAL_STORAGE_SETTINGS_KEY = 'pcpTrackerSettings';
+

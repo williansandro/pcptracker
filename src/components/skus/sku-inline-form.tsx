@@ -23,7 +23,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const skuInlineFormSchema = z.object({
   code: z.string().min(1, "Código é obrigatório.").max(50, "Código não pode exceder 50 caracteres."),
   description: z.string().min(1, "Descrição é obrigatória.").max(255, "Descrição não pode exceder 255 caracteres."),
-  unitOfMeasure: z.string().min(1, "Unidade de Medida é obrigatória.").max(20, "Un. Medida não pode exceder 20 caracteres."),
 });
 
 type SkuInlineFormValues = z.infer<typeof skuInlineFormSchema>;
@@ -37,7 +36,6 @@ export function SkuInlineForm() {
     defaultValues: {
       code: "",
       description: "",
-      unitOfMeasure: "",
     },
   });
 
@@ -48,11 +46,9 @@ export function SkuInlineForm() {
       form.reset(); 
     } catch (error: any) {
       console.error("Erro ao adicionar SKU (formulário inline):", error);
-      toast({
-        title: "Erro ao Adicionar SKU",
-        description: error.message || "Não foi possível adicionar o SKU. Verifique o console para mais detalhes.",
-        variant: "destructive",
-      });
+      // O toast de erro já é tratado no AppContext, mas podemos adicionar um específico aqui se necessário.
+      // Se addSku relançar o erro, podemos até evitar o toast aqui para não duplicar.
+      // Por enquanto, o relançamento do erro no addSku e o toast lá parecem suficientes.
     }
   };
 
@@ -63,7 +59,7 @@ export function SkuInlineForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 md:grid-cols-4 md:items-end">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-end">
             <FormField
               control={form.control}
               name="code"
@@ -85,19 +81,6 @@ export function SkuInlineForm() {
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
                     <Input placeholder="Descrição do SKU" {...field} value={field.value ?? ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="unitOfMeasure"
-              render={({ field }) => (
-                <FormItem className="md:col-span-1">
-                  <FormLabel>Un. Medida</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: PC, KG, LT" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

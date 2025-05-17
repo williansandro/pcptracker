@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,7 +28,8 @@ import { useAppContext } from "@/contexts/app-context";
 import type { SKU } from "@/types";
 import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from "lucide-react"; // Edit icon não é usado aqui
+// PlusCircle não é mais usado aqui, o trigger é externo
+// import { PlusCircle } from "lucide-react"; 
 
 const skuFormSchema = z.object({
   code: z.string().min(1, "Código é obrigatório").max(50, "Código não pode exceder 50 caracteres."),
@@ -37,17 +39,21 @@ const skuFormSchema = z.object({
 type SkuFormValues = z.infer<typeof skuFormSchema>;
 
 interface SkuFormDialogProps {
-  sku?: SKU; 
-  trigger?: React.ReactNode;
+  sku: SKU; // Agora é obrigatório, pois este formulário é apenas para edição
+  trigger: React.ReactNode; // O trigger agora é obrigatório e passado de fora
 }
 
 export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
-  const { addSku, updateSku } = useAppContext();
+  const { updateSku } = useAppContext();
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
   const getInitialValues = useCallback(() => {
-    return sku ? { code: sku.code, description: sku.description } : { code: "", description: "" };
+    // Garante que os valores iniciais sejam strings vazias se as props estiverem ausentes
+    return { 
+      code: sku?.code || "", 
+      description: sku?.description || "",
+    };
   }, [sku]);
   
 
@@ -57,42 +63,34 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
   });
 
   useEffect(() => {
-    if(open) { // Reset form when dialog opens or sku prop changes
+    if(open && sku) { 
       form.reset(getInitialValues());
     }
   }, [sku, form, open, getInitialValues]);
 
 
   const onSubmit = (data: SkuFormValues) => {
+    if (!sku) return; // Segurança adicional, embora sku seja obrigatório
     try {
-      if (sku) {
-        updateSku(sku.id, data);
-        toast({ title: "SKU Atualizado", description: `SKU ${data.code} atualizado com sucesso.` });
-      } else {
-        addSku(data);
-        toast({ title: "SKU Adicionado", description: `SKU ${data.code} adicionado com sucesso.` });
-      }
+      updateSku(sku.id, data);
+      toast({ title: "SKU Atualizado", description: `SKU ${data.code} atualizado com sucesso.` });
       setOpen(false);
     } catch (error) {
-      toast({ title: "Erro", description: "Não foi possível salvar o SKU.", variant: "destructive" });
-      console.error("Erro ao salvar SKU:", error);
+      toast({ title: "Erro ao Atualizar", description: "Não foi possível salvar as alterações do SKU.", variant: "destructive" });
+      console.error("Erro ao atualizar SKU:", error);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ? trigger : (
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar SKU
-          </Button>
-        )}
+        {trigger}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{sku ? "Editar SKU" : "Adicionar Novo SKU"}</DialogTitle>
+          <DialogTitle>Editar SKU</DialogTitle>
           <DialogDescription>
-            {sku ? "Atualize os detalhes do SKU." : "Preencha os detalhes para um novo SKU."}
+            Atualize os detalhes do SKU.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -104,7 +102,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                 <FormItem>
                   <FormLabel>Código do SKU</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: PROD001-AZ" {...field} />
+                    <Input placeholder="Ex: PROD001-AZ" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -117,7 +115,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Descrição detalhada do SKU..." {...field} />
+                    <Textarea placeholder="Descrição detalhada do SKU..." {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -125,7 +123,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit">Salvar SKU</Button>
+              <Button type="submit">Salvar Alterações</Button>
             </DialogFooter>
           </form>
         </Form>

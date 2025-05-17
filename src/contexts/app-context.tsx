@@ -8,7 +8,6 @@ import {
   DUMMY_SKUS_DATA,
   DUMMY_PRODUCTION_ORDERS_DATA,
   DUMMY_DEMANDS_DATA,
-  PRODUCTION_ORDER_STATUSES,
 } from '@/lib/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
@@ -23,7 +22,7 @@ import {
   where,
   getCountFromServer,
   setDoc,
-  deleteField, // Importar deleteField se necessário para remover campos
+  deleteField,
 } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 
@@ -78,7 +77,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const mapDocToSku = (docData: any): SKU => ({
-    ...docData,
+    id: docData.id,
+    code: docData.code,
+    description: docData.description,
+    createdAt: docData.createdAt,
   } as SKU);
 
   const mapDocToProductionOrder = (docData: any): ProductionOrder => ({
@@ -135,9 +137,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           skuId: skuForPo.id,
           status,
           producedQuantity: status === 'Concluída' ? poData.producedQuantity : undefined,
-          startTime: status === 'Em Progresso' || status === 'Concluída' ? poData.startTime : undefined,
-          endTime: status === 'Concluída' ? poData.endTime : undefined,
-          productionTime: status === 'Concluída' ? poData.productionTime : undefined,
+          startTime: status === 'Em Progresso' || status === 'Concluída' ? poData.startTime : null,
+          endTime: status === 'Concluída' ? poData.endTime : null,
+          productionTime: status === 'Concluída' ? poData.productionTime : null,
           createdAt: new Date(Date.now() - (DUMMY_PRODUCTION_ORDERS_DATA.length - index) * 10 * 60 * 1000).toISOString(),
         };
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, newPo.id);
@@ -184,9 +186,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const seededData = await seedDatabase();
 
       if (seededData) { 
-        setSkus(seededData.skus);
-        setProductionOrders(seededData.pos);
-        setDemands(seededData.demands);
+        setSkus(seededData.skus.map(mapDocToSku));
+        setProductionOrders(seededData.pos.map(mapDocToProductionOrder));
+        setDemands(seededData.demands.map(mapDocToDemand));
         console.log("Dados do seeding aplicados ao estado local.");
       } else { 
         const skusQuery = query(collection(db, SKUS_COLLECTION));
@@ -241,6 +243,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         description: `Não foi possível adicionar o SKU. ${error.message}`,
         variant: "destructive",
       });
+      throw error; // Relançar o erro para que o formulário possa tratá-lo
     }
   }, [toast]);
 
@@ -249,22 +252,34 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const skuRef = doc(db, SKUS_COLLECTION, skuId);
       await updateDoc(skuRef, skuData);
       setSkus(prev => prev.map(s => s.id === skuId ? { ...s, ...skuData, code: skuData.code || s.code, description: skuData.description || s.description } as SKU : s));
+      toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || skus.find(s=>s.id === skuId)?.code} atualizado.`});
     } catch (error: any)      {
-      console.error("Erro ao atualizar SKU:", skuId, error);
-      toast({
-        title: "Erro ao Atualizar SKU",
-        description: (error as Error).message || "Não foi possível atualizar o SKU.",
-        variant: "destructive",
-      });
+      const firebaseError = error as { code?: string };
+      if (firebaseError.code === 'not-found') {
+        console.error("Erro ao atualizar SKU: Documento não encontrado.", skuId, error);
+        toast({
+          title: "Erro: SKU Não Encontrado",
+          description: "Este SKU não foi encontrado no banco de dados e pode ter sido excluído. Removendo da lista local.",
+          variant: "destructive",
+        });
+        setSkus(prev => prev.filter(s => s.id !== skuId));
+      } else {
+        console.error("Erro ao atualizar SKU:", skuId, error);
+        toast({
+          title: "Erro ao Atualizar SKU",
+          description: (error as Error).message || "Não foi possível atualizar o SKU.",
+          variant: "destructive",
+        });
+      }
     }
-  }, [toast]);
+  }, [toast, skus]);
 
   const deleteSku = useCallback(async (skuId: string) => {
     const skuToDelete = skus.find(s => s.id === skuId);
     if (!skuToDelete) {
         console.error("Tentativa de excluir SKU não encontrado no estado local:", skuId);
         toast({ title: "Erro Interno", description: "SKU não encontrado para exclusão.", variant: "destructive" });
-        return;
+        throw new Error("SKU não encontrado para exclusão.");
     }
 
     const posQuery = query(collection(db, PRODUCTION_ORDERS_COLLECTION), where("skuId", "==", skuId));
@@ -285,7 +300,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (reasons.length > 0) {
       const errorMessage = `O SKU ${skuToDelete.code} não pode ser excluído pois possui ${reasons.join(' e ')} associada(s).`;
       console.error(errorMessage);
-      toast({ title: "Falha ao Excluir", description: errorMessage, variant: "destructive" });
+      toast({ title: "Falha ao Excluir", description: errorMessage, variant: "destructive", duration: 7000 });
       throw new Error(errorMessage); 
     }
     try {
@@ -346,9 +361,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
          console.error("Erro ao excluir SKUs em lote do Firestore:", error);
          const tempNotDeleted = [...skusNotDeleted];
          skusToDeleteCompletely.forEach(id => {
-            const sku = currentSkusState.find(s => s.id === id);
-            if(sku && !tempNotDeleted.find(nd => nd.code === sku.code)) {
-                 tempNotDeleted.push({code: sku.code, reason: "Erro no servidor durante exclusão"});
+            const skuFound = currentSkusState.find(s => s.id === id);
+            if(skuFound && !tempNotDeleted.find(nd => nd.code === skuFound.code)) {
+                 tempNotDeleted.push({code: skuFound.code, reason: "Erro no servidor durante exclusão"});
             }
          });
          toast({
@@ -393,14 +408,12 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateProductionOrder = useCallback(async (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => {
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
-      // Garante que `undefined` não seja enviado, o que causa erro no Firestore.
-      // Se um campo deve ser removido, use deleteField(). Se deve ser nulo, use null.
       const updateData = Object.entries(poData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
           acc[key as keyof typeof poData] = value;
         }
         return acc;
-      }, {} as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+      }, {} as any); 
 
       if (Object.keys(updateData).length > 0) {
         await updateDoc(poRef, updateData);
@@ -452,7 +465,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         toast({ title: "Ação Inválida", description: "Só é possível iniciar OPs com status 'Aberta'.", variant: "default" });
         return;
     }
-    // Alterado para usar null em vez de undefined para compatibilidade com Firestore
     const updateData = { 
       status: 'Em Progresso' as ProductionOrderStatus, 
       startTime: new Date().toISOString(), 
@@ -463,7 +475,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
       await updateDoc(poRef, updateData);
       setProductionOrders(prev => prev.map(po =>
-        po.id === poId ? { ...po, ...updateData } : po
+        po.id === poId ? { ...po, ...updateData } as ProductionOrder : po
       ));
     } catch (error: any) {
       console.error("Erro ao iniciar timer da OP:", poId, error);
@@ -484,7 +496,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
         await updateDoc(poRef, updateData);
-        setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...updateData } : po));
+        setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po));
       } catch (error: any) {
         console.error("Erro ao parar timer da OP:", poId, error);
         toast({
@@ -522,13 +534,12 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateDemand = useCallback(async (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => {
     try {
       const demandRef = doc(db, DEMANDS_COLLECTION, demandId);
-      // Garante que `undefined` não seja enviado
       const updateData = Object.entries(demandData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
           acc[key as keyof typeof demandData] = value;
         }
         return acc;
-      }, {} as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+      }, {} as any); 
 
       if (Object.keys(updateData).length > 0) {
         await updateDoc(demandRef, updateData);

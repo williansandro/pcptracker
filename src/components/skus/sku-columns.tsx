@@ -46,7 +46,7 @@ export const skuColumns: ColumnDef<SKU>[] = [
         </Button>
       )
     },
-    cell: ({ row }) => <div className="font-medium">{row.getValue("code")}</div>,
+    cell: ({ row }) => <div className="font-medium text-primary">{row.getValue("code")}</div>,
   },
   {
     accessorKey: "description",
@@ -68,7 +68,7 @@ export const skuColumns: ColumnDef<SKU>[] = [
     },
     cell: ({ row }) => {
       const dateString = row.getValue("createdAt") as string;
-      return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" locale={ptBR} /></div>;
+      return <div><ClientSideDateTime dateString={dateString} outputFormat="dd/MM/yyyy HH:mm" locale={ptBR} placeholder="-" /></div>;
     },
   },
   {
