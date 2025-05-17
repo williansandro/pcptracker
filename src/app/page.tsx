@@ -5,7 +5,7 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon } from 'lucide-react';
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp } from 'lucide-react';
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -17,14 +17,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ClientSideDateTime } from "@/components/client-side-date-time";
 import { formatDuration, cn } from "@/lib/utils";
 import { ptBR } from 'date-fns/locale';
-import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer as RechartsResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
 
 const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
-  Aberta: "hsl(var(--chart-3))", 
-  "Em Progresso": "hsl(var(--chart-4))", 
-  Concluída: "hsl(var(--chart-2))", 
-  Cancelada: "hsl(var(--chart-5))", 
+  Aberta: "hsl(var(--chart-3))",
+  "Em Progresso": "hsl(var(--chart-4))",
+  Concluída: "hsl(var(--chart-2))",
+  Cancelada: "hsl(var(--chart-5))",
 };
 
 interface CompletedPoDetails extends ProductionOrder {
@@ -98,7 +98,7 @@ export default function DashboardPage() {
           secondsPerUnit,
         };
       })
-      .sort((a, b) => (b.endTime && a.endTime) ? new Date(b.endTime).getTime() - new Date(a.endTime).getTime() : 0); // Mais recentes primeiro
+      .sort((a, b) => (b.endTime && a.endTime) ? new Date(b.endTime).getTime() - new Date(a.endTime).getTime() : 0);
   }, [productionOrders, findSkuById]);
 
   const avgProductionTimePerSkuData = useMemo(() => {
@@ -127,15 +127,31 @@ export default function DashboardPage() {
         };
       })
       .filter(item => item.avgTimeSeconds > 0)
-      .sort((a, b) => b.poCount - a.poCount) // Prioriza SKUs com mais OPs concluídas
-      .slice(0, 5); // Pega o top 5
+      .sort((a, b) => b.poCount - a.poCount)
+      .slice(0, 5);
 
     return skusWithAvgTime.map((item, index) => ({
       skuCode: item.skuCode,
       avgTimeFormatted: formatDuration(item.avgTimeSeconds),
-      avgTimeSeconds: item.avgTimeSeconds, // para o eixo X do gráfico
+      avgTimeSeconds: item.avgTimeSeconds,
       fill: `hsl(var(--chart-${(index % 5) + 1}))`,
     }));
+  }, [productionOrders, findSkuById]);
+
+  const metaVsRealizadoOPData = useMemo(() => {
+    const relevantPOs = productionOrders
+      .filter(po => po.status === 'Concluída' || po.status === 'Em Progresso')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) // Mais recentes primeiro
+      .slice(0, 7); // Pegar as 7 OPs mais recentes
+
+    return relevantPOs.map(po => {
+      const sku = findSkuById(po.skuId);
+      return {
+        name: `OP ${po.id.substring(0, 4)} - ${sku?.code || 'N/D'}`,
+        meta: po.targetQuantity,
+        realizado: po.producedQuantity || 0, // Default to 0 if not produced yet
+      };
+    }).reverse(); // Reverter para mostrar as mais antigas primeiro no gráfico (da esquerda para a direita)
   }, [productionOrders, findSkuById]);
 
 
@@ -148,10 +164,46 @@ export default function DashboardPage() {
         <MetricCard title="Tempo Médio de Produção (Geral)" value={avgProductionTimeOverall} icon={Clock3} description="Tempo médio por ordem concluída" className="metric-card-teal"/>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4">
         <ProductionChart />
-        <DemandFulfillmentCard />
       </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <DemandFulfillmentCard />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Meta vs. Realizado por OP
+            </CardTitle>
+            <CardDescription>Comparativo de Quantidade Alvo e Produzida para OPs recentes.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {metaVsRealizadoOPData.length > 0 ? (
+              <ChartContainer config={{}} className="aspect-video max-h-[300px]">
+                <RechartsResponsiveContainer width="100%" height={300}>
+                  <BarChart data={metaVsRealizadoOPData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={10} interval={0} angle={-30} textAnchor="end" height={60} />
+                    <YAxis stroke="hsl(var(--foreground))" fontSize={12} />
+                    <RechartsTooltip
+                      cursor={{ fill: 'hsl(var(--muted))' }}
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number, name: string) => [value.toLocaleString('pt-BR') + ' un.', name.charAt(0).toUpperCase() + name.slice(1)]}
+                    />
+                    <RechartsLegend wrapperStyle={{ fontSize: '12px' }} />
+                    <Bar dataKey="meta" name="Meta" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={20} />
+                    <Bar dataKey="realizado" name="Realizado" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={20} />
+                  </BarChart>
+                </RechartsResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="text-center text-muted-foreground py-10">Nenhuma OP "Em Progresso" ou "Concluída" para exibir.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
 
       <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
         <Card>
@@ -184,7 +236,7 @@ export default function DashboardPage() {
                         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                        return (percent * 100) > 5 ? ( 
+                        return (percent * 100) > 5 ? (
                           <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
                             {`${(percent * 100).toFixed(0)}%`}
                           </text>
@@ -238,7 +290,7 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -252,23 +304,23 @@ export default function DashboardPage() {
               <ChartContainer config={{}} className="aspect-video max-h-[300px]">
                 <RechartsResponsiveContainer width="100%" height={300}>
                   <BarChart data={avgProductionTimePerSkuData} layout="vertical" margin={{ right: 30, left: 20 }}>
-                    <XAxis 
-                      type="number" 
-                      dataKey="avgTimeSeconds" 
-                      stroke="hsl(var(--foreground))" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickFormatter={(value) => formatDuration(value)} 
+                    <XAxis
+                      type="number"
+                      dataKey="avgTimeSeconds"
+                      stroke="hsl(var(--foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => formatDuration(value)}
                     />
-                    <YAxis 
-                      dataKey="skuCode" 
-                      type="category" 
-                      stroke="hsl(var(--foreground))" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      width={80} 
+                    <YAxis
+                      dataKey="skuCode"
+                      type="category"
+                      stroke="hsl(var(--foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      width={80}
                       interval={0}
                     />
                     <RechartsTooltip
@@ -295,7 +347,7 @@ export default function DashboardPage() {
 
       </div>
 
-      <Card className="lg:col-span-3"> {/* Ajustado para ocupar toda a largura na nova configuração de grid dos charts */}
+      <Card className="lg:col-span-3">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ListChecks className="h-5 w-5 text-primary" />
@@ -319,7 +371,7 @@ export default function DashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {completedPoDetails.map((po, index) => (
-                    <TableRow 
+                    <TableRow
                       key={po.id}
                       className={cn(
                         index % 2 !== 0 ? "bg-[#EBEBEB]" : ""
@@ -351,4 +403,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
