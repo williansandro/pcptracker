@@ -90,6 +90,8 @@ export default function DashboardPage() {
 
   const topSkusByProducedQuantityData = useMemo(() => {
     const skuProduction: Record<string, { totalProduced: number; skuObject: SKU }> = {};
+    // Para o Top SKUs, usamos todas as OPs, não apenas as filtradas,
+    // pois o filtro de SKU é aplicado AO CLICAR neste gráfico.
     allProductionOrders.forEach(po => {
       if (po.status === 'Concluída' && po.producedQuantity && po.producedQuantity > 0) {
         const sku = findSkuById(po.skuId);
@@ -110,7 +112,7 @@ export default function DashboardPage() {
         skuId: item.skuObject.id,
         totalProduced: item.totalProduced,
         fill: CHART_COLORS[index % CHART_COLORS.length],
-        skuObject: item.skuObject
+        skuObject: item.skuObject // Importante para o clique
       }));
   }, [allProductionOrders, findSkuById]);
 
@@ -134,7 +136,13 @@ export default function DashboardPage() {
   }, [filteredProductionOrders, findSkuById]);
 
   const avgProductionTimePerSkuData = useMemo(() => {
-    const completedPOs = filteredProductionOrders.filter(
+    // Para este gráfico, faz sentido usar as OPs filtradas se um SKU estiver selecionado,
+    // ou todas as OPs se nenhum SKU estiver selecionado (para mostrar o top 5 geral).
+    const sourcePOs = selectedSkuFilter
+      ? filteredProductionOrders // Se um SKU está filtrado, mostramos apenas ele (ou nada se não tiver dados)
+      : allProductionOrders;    // Se nenhum SKU filtrado, mostramos o top 5 geral
+
+    const completedPOs = sourcePOs.filter(
       (po) => po.status === 'Concluída' && po.productionTime && po.productionTime > 0
     );
 
@@ -159,8 +167,8 @@ export default function DashboardPage() {
         };
       })
       .filter(item => item.avgTimeSeconds > 0)
-      .sort((a, b) => b.poCount - a.poCount)
-      .slice(0, 5);
+      .sort((a, b) => b.poCount - a.poCount) // Ordenar por contagem de OPs para mostrar os mais frequentes
+      .slice(0, selectedSkuFilter ? 1 : 5); // Se SKU filtrado, mostrar só ele, senão top 5
 
     return skusWithAvgTime.map((item, index) => ({
       skuCode: item.skuCode,
@@ -168,10 +176,10 @@ export default function DashboardPage() {
       avgTimeSeconds: item.avgTimeSeconds,
       fill: CHART_COLORS[index % CHART_COLORS.length],
     }));
-  }, [filteredProductionOrders, findSkuById]);
+  }, [selectedSkuFilter, filteredProductionOrders, allProductionOrders, findSkuById]);
 
   const metaVsRealizadoOPData = useMemo(() => {
-    const relevantPOs = filteredProductionOrders
+    const relevantPOs = filteredProductionOrders // Usa OPs filtradas
       .filter(po => po.status === 'Concluída' || po.status === 'Em Progresso')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 7);
@@ -179,7 +187,7 @@ export default function DashboardPage() {
     return relevantPOs.map(po => {
       const sku = findSkuById(po.skuId);
       return {
-        name: `OP ${po.id.substring(0, 4)}... - ${sku?.code || 'N/D'}`,
+        name: `OP ${po.id.substring(0, 4)}... (${sku?.code || 'N/D'})`,
         meta: po.targetQuantity,
         realizado: po.producedQuantity || 0,
       };
@@ -215,7 +223,7 @@ export default function DashboardPage() {
         <MetricCard title="Total de SKUs" value={<span className="text-primary">{totalSKUs}</span>} icon={Package} description="Número de SKUs cadastrados" />
         <MetricCard title="Ordens Abertas/Em Progresso" value={<span className="text-primary">{totalOpenOrInProgressPOs}</span>} icon={Factory} description={`Ordens pendentes ou em execução ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
         <MetricCard title="Ordens Concluídas" value={<span className="text-primary">{completedPOsCount}</span>} icon={CheckCircle2} description={`Ordens de produção finalizadas ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
-        <MetricCard title="Tempo Médio de Produção (Geral)" value={<span className="text-primary">{avgProductionTimeOverall}</span>} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} />
+        <MetricCard title="Tempo Médio de Produção" value={<span className="text-primary">{avgProductionTimeOverall}</span>} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} />
       </div>
 
       <div className="flex items-center justify-start gap-4 mb-0 -mt-2">
@@ -234,7 +242,7 @@ export default function DashboardPage() {
           </SelectContent>
         </Select>
         {selectedSkuFilter && (
-          <Button onClick={handleClearFilter} variant="outline" size="sm">
+          <Button onClick={handleClearFilter} variant="outline" size="sm" className="h-9">
             <FilterX className="mr-2 h-4 w-4" />
             Limpar Filtro: {selectedSkuFilter.code}
           </Button>
@@ -244,15 +252,15 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4">
         <ProductionChart
           productionOrders={filteredProductionOrders}
-          demands={selectedSkuFilter ? filteredDemands : allDemands}
+          demands={selectedSkuFilter ? filteredDemands : allDemands} // Passa demandas filtradas ou todas
           selectedSku={selectedSkuFilter}
         />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <DemandFulfillmentCard
-          demands={selectedSkuFilter ? filteredDemands : allDemands}
-          productionOrders={filteredProductionOrders}
+          demands={allDemands} // Passa todas as demandas, o filtro de SKU será aplicado dentro do card
+          productionOrders={allProductionOrders} // Passa todas as OPs
           selectedSku={selectedSkuFilter}
         />
         <Card>
@@ -458,7 +466,6 @@ export default function DashboardPage() {
                     <TableHead className="text-center">Qtd. Prod.</TableHead>
                     <TableHead className="text-center">Início</TableHead>
                     <TableHead className="text-center">Fim</TableHead>
-                    {/* <TableHead className="text-center">Pausa</TableHead> Remoção solicitada implicitamente pela imagem */}
                     <TableHead className="text-center">Tempo Líquido</TableHead>
                     <TableHead className="text-right">Seg/Unid.</TableHead>
                   </TableRow>
@@ -481,7 +488,6 @@ export default function DashboardPage() {
                       <TableCell className="text-center">
                         <ClientSideDateTime dateString={po.endTime} outputFormat="dd/MM/yyyy, HH:mm:ss" locale={ptBR} placeholder="-" />
                       </TableCell>
-                      {/* <TableCell className="text-center">Não</TableCell>  Remoção solicitada implicitamente pela imagem */}
                       <TableCell className="text-center">{formatDuration(po.productionTime)}</TableCell>
                       <TableCell className={cn("text-right font-semibold", po.secondsPerUnit !== 'N/D' ? 'text-accent' : 'text-muted-foreground')}>
                         {po.secondsPerUnit}
@@ -499,4 +505,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
