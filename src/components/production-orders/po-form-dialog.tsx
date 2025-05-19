@@ -32,6 +32,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea
 
 const poFormSchema = z.object({
   skuId: z.string().min(1, "SKU é obrigatório."),
@@ -43,8 +44,7 @@ const poFormSchema = z.object({
   producedQuantity: z.coerce.number().optional(),
 })
 .superRefine((data, ctx) => {
-  // data.status aqui será o status atual da OP que está sendo editada, pois o select de status é desabilitado para OPs em andamento/concluídas
-  const currentStatus = data.status; // Usar o status que vem do formulário, que é o status original da OP
+  const currentStatus = data.status; 
 
   if (currentStatus === 'Concluída') {
     if (!data.startTime) {
@@ -81,7 +81,7 @@ const formatIsoToDateTimeLocal = (isoString: string | undefined | null): string 
     return format(parseISO(isoString), "yyyy-MM-dd'T'HH:mm");
   } catch (error) {
     console.warn("Erro ao formatar data para datetime-local:", isoString, error);
-    return ""; // Retorna string vazia se houver erro na conversão
+    return ""; 
   }
 };
 
@@ -96,7 +96,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     ? {
         skuId: productionOrder.skuId,
         targetQuantity: productionOrder.targetQuantity,
-        producedQuantity: productionOrder.producedQuantity,
+        producedQuantity: productionOrder.producedQuantity ?? undefined, // Garante que é undefined se null
         notes: productionOrder.notes || "",
         status: productionOrder.status,
         startTime: formatIsoToDateTimeLocal(productionOrder.startTime),
@@ -128,7 +128,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
   const onSubmit = (data: PoFormValues) => {
     try {
       const sku = findSkuById(data.skuId);
-      if (productionOrder) { // Editando OP existente
+      if (productionOrder) { 
         const updatePayload: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>> = {
           skuId: data.skuId,
           targetQuantity: data.targetQuantity,
@@ -138,9 +138,9 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
 
         if (productionOrder.status === 'Em Progresso') {
           updatePayload.startTime = data.startTime ? new Date(data.startTime).toISOString() : null;
-          updatePayload.endTime = null;
+          updatePayload.endTime = null; 
           updatePayload.productionTime = null;
-          updatePayload.producedQuantity = null;
+          updatePayload.producedQuantity = undefined;
         } else if (productionOrder.status === 'Concluída') {
           updatePayload.startTime = data.startTime ? new Date(data.startTime).toISOString() : null;
           updatePayload.endTime = data.endTime ? new Date(data.endTime).toISOString() : null;
@@ -159,13 +159,12 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
              updatePayload.productionTime = null;
           }
         }
-        // Não mexer em status ou producedQuantity se o status original for 'Aberta' ou 'Cancelada' aqui.
-        // Ações de iniciar/completar/cancelar são separadas.
+        
 
         updateProductionOrder(productionOrder.id, updatePayload);
         toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) atualizada.` });
 
-      } else { // Criando nova OP
+      } else { 
         addProductionOrder({ skuId: data.skuId, targetQuantity: data.targetQuantity, notes: data.notes });
         toast({ title: "Ordem de Produção Adicionada", description: `Nova OP para ${sku?.code || ''} adicionada.` });
       }
@@ -199,143 +198,155 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             {productionOrder ? "Atualize os detalhes da OP." : "Preencha os detalhes para uma nova OP."}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="skuId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SKU</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    defaultValue={field.value} 
-                    value={field.value} 
-                    disabled={!!productionOrder && currentPoStatusForEdit !== 'Aberta'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um SKU" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {sortedSkus.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="targetQuantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantidade Alvo</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="100" 
-                      {...field} 
+        <ScrollArea className="max-h-[65vh] pr-6"> {/* Apply ScrollArea and max-height */}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={form.control}
+                name="skuId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SKU</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value} 
+                      value={field.value} 
                       disabled={!!productionOrder && currentPoStatusForEdit !== 'Aberta'}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {/* Campo Status (apenas para visualização) */}
-            {productionOrder && (
-              <FormField
-                control={form.control}
-                name="status" // Este campo é usado para preencher o valor inicial e para a lógica de validação
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <FormControl>
-                       <Input {...field} readOnly disabled className="bg-muted/50" />
-                    </FormControl>
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um SKU" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {sortedSkus.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
-
-            {/* Campos de Data/Hora */}
-            {productionOrder && (currentPoStatusForEdit === 'Em Progresso' || currentPoStatusForEdit === 'Concluída') && (
               <FormField
                 control={form.control}
-                name="startTime"
+                name="targetQuantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Data de Início</FormLabel>
+                    <FormLabel>Quantidade Alvo</FormLabel>
                     <FormControl>
-                      <Input type="datetime-local" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {productionOrder && currentPoStatusForEdit === 'Concluída' && (
-              <FormField
-                control={form.control}
-                name="endTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data de Término</FormLabel>
-                    <FormControl>
-                      <Input type="datetime-local" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            
-            {/* Quantidade Produzida (visível se status for 'Concluída') */}
-            {productionOrder && currentPoStatusForEdit === 'Concluída' && (
-               <FormField
-                control={form.control}
-                name="producedQuantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantidade Produzida</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="Ex: 95" {...field} 
-                        onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)}
+                      <Input 
+                        type="number" 
+                        placeholder="100" 
+                        {...field} 
+                        disabled={!!productionOrder && currentPoStatusForEdit !== 'Aberta'}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observações</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Observações adicionais (opcional)" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+              
+              {productionOrder && (
+                <FormField
+                  control={form.control}
+                  name="status" 
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <FormControl>
+                         <Input {...field} readOnly disabled className="bg-muted/50" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
-            />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={currentPoStatusForEdit === 'Cancelada'}>Salvar Ordem</Button>
-            </DialogFooter>
-          </form>
-        </Form>
+
+              
+              {productionOrder && (currentPoStatusForEdit === 'Em Progresso' || currentPoStatusForEdit === 'Concluída') && (
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data de Início</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {productionOrder && currentPoStatusForEdit === 'Concluída' && (
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data de Término</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              
+              {productionOrder && currentPoStatusForEdit === 'Concluída' && (
+                 <FormField
+                  control={form.control}
+                  name="producedQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantidade Produzida</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="Ex: 95" 
+                          {...field} 
+                          value={field.value ?? ''}
+                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observações</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Observações adicionais (opcional)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* DialogFooter é movido para fora da ScrollArea */}
+            </form>
+          </Form>
+        </ScrollArea>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button 
+            type="button" /* Alterado para button, o submit é do form */
+            onClick={form.handleSubmit(onSubmit)} 
+            disabled={currentPoStatusForEdit === 'Cancelada'}
+          >
+            Salvar Ordem
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
