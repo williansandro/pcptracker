@@ -16,7 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/app-context";
 import React from "react";
-import { useToast } from "@/hooks/use-toast";
+// useToast já é tratado no AppContext para addSku
+// import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -29,7 +30,7 @@ type SkuInlineFormValues = z.infer<typeof skuInlineFormSchema>;
 
 export function SkuInlineForm() {
   const { addSku } = useAppContext();
-  const { toast } = useToast();
+  // const { toast } = useToast(); // Removido pois o toast de sucesso/erro é tratado no AppContext
 
   const form = useForm<SkuInlineFormValues>({
     resolver: zodResolver(skuInlineFormSchema),
@@ -41,18 +42,15 @@ export function SkuInlineForm() {
 
   const onSubmit = async (data: SkuInlineFormValues) => {
     try {
-      await addSku(data); // addSku agora pode lançar um erro
-      toast({ title: "SKU Adicionado", description: `SKU ${data.code} adicionado com sucesso.` });
-      form.reset();
+      // O código já será salvo em maiúsculas se o input forçar,
+      // mas a verificação de duplicidade no AppContext também considera uppercase.
+      await addSku(data);
+      // O toast de sucesso é disparado pelo AppContext agora
+      form.reset(); // Limpar o formulário apenas em caso de sucesso
     } catch (error: any) {
-      // O toast de erro já é tratado no AppContext se for um erro genérico.
-      // Se addSku lançar um erro específico como "DUPLICATE_SKU_CODE", 
-      // o toast no AppContext já mostrará a mensagem correta.
-      // Não é necessário exibir outro toast aqui, a menos que queira personalizar
-      // a mensagem para este formulário especificamente.
-      console.error("Erro ao adicionar SKU (formulário inline):", error);
-      // Se for um erro de duplicidade, o toast do AppContext será exibido.
+      // O toast de erro (incluindo duplicidade) é disparado pelo AppContext.
       // Não resetar o formulário em caso de erro para o usuário poder corrigir.
+      console.error("Erro ao adicionar SKU (formulário inline):", error.message);
     }
   };
 
@@ -71,7 +69,12 @@ export function SkuInlineForm() {
                 <FormItem className="md:col-span-1">
                   <FormLabel>Código</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: SKU001" {...field} value={field.value ?? ''} />
+                    <Input
+                      placeholder="Ex: SKU001"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      value={field.value ?? ''}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -100,4 +103,3 @@ export function SkuInlineForm() {
     </Card>
   );
 }
-

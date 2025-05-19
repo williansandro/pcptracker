@@ -28,8 +28,6 @@ import { useAppContext } from "@/contexts/app-context";
 import type { SKU } from "@/types";
 import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-// PlusCircle não é mais usado aqui, o trigger é externo
-// import { PlusCircle } from "lucide-react"; 
 
 const skuFormSchema = z.object({
   code: z.string().min(1, "Código é obrigatório").max(50, "Código não pode exceder 50 caracteres."),
@@ -39,8 +37,8 @@ const skuFormSchema = z.object({
 type SkuFormValues = z.infer<typeof skuFormSchema>;
 
 interface SkuFormDialogProps {
-  sku: SKU; // Agora é obrigatório, pois este formulário é apenas para edição
-  trigger: React.ReactNode; // O trigger agora é obrigatório e passado de fora
+  sku: SKU;
+  trigger: React.ReactNode;
 }
 
 export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
@@ -49,13 +47,11 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
   const { toast } = useToast();
 
   const getInitialValues = useCallback(() => {
-    // Garante que os valores iniciais sejam strings vazias se as props estiverem ausentes
-    return { 
-      code: sku?.code || "", 
+    return {
+      code: sku?.code || "",
       description: sku?.description || "",
     };
   }, [sku]);
-  
 
   const form = useForm<SkuFormValues>({
     resolver: zodResolver(skuFormSchema),
@@ -63,15 +59,18 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
   });
 
   useEffect(() => {
-    if(open && sku) { 
+    if (open && sku) {
       form.reset(getInitialValues());
     }
   }, [sku, form, open, getInitialValues]);
 
-
   const onSubmit = (data: SkuFormValues) => {
-    if (!sku) return; // Segurança adicional, embora sku seja obrigatório
+    if (!sku) return;
     try {
+      // A verificação de duplicidade de código ao editar não é trivial
+      // se permitir a alteração do código. Por ora, mantemos o código não editável
+      // ou assumimos que a alteração de código não pode colidir com outros existentes.
+      // O AppContext não tem validação de duplicidade no updateSku atualmente.
       updateSku(sku.id, data);
       toast({ title: "SKU Atualizado", description: `SKU ${data.code} atualizado com sucesso.` });
       setOpen(false);
@@ -90,7 +89,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
         <DialogHeader>
           <DialogTitle>Editar SKU</DialogTitle>
           <DialogDescription>
-            Atualize os detalhes do SKU.
+            Atualize os detalhes do SKU. O código não pode ser alterado após a criação.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -102,7 +101,14 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                 <FormItem>
                   <FormLabel>Código do SKU</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: PROD001-AZ" {...field} value={field.value ?? ''} />
+                    <Input
+                      placeholder="Ex: PROD001-AZ"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      value={field.value ?? ''}
+                      readOnly // Código não é editável após a criação
+                      className="bg-muted/50 cursor-not-allowed"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
