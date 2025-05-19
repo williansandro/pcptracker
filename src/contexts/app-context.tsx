@@ -23,9 +23,10 @@ import {
   getCountFromServer,
   setDoc,
   deleteField,
+  documentId
 } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/contexts/auth-context'; // Importar useAuth
+import { useAuth } from '@/contexts/auth-context';
 
 const SKUS_COLLECTION = 'skus';
 const PRODUCTION_ORDERS_COLLECTION = 'productionOrders';
@@ -40,7 +41,7 @@ interface DeleteSelectedSkusResult {
 interface AppContextType {
   skus: SKU[];
   addSku: (skuData: Omit<SKU, 'id' | 'createdAt'>) => Promise<void>;
-  updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt' | 'unitOfMeasure'>>) => Promise<void>;
+  updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => Promise<void>;
   deleteSku: (skuId: string) => Promise<void>;
   deleteSelectedSkus: (skuIds: string[]) => Promise<DeleteSelectedSkusResult>;
   findSkuById: (skuId: string) => SKU | undefined;
@@ -72,7 +73,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [demands, setDemands] = useState<Demand[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
-  const { currentUser, loading: authLoading } = useAuth(); // Obter currentUser e authLoading
+  const { currentUser, loading: authLoading } = useAuth();
 
   useEffect(() => {
     setIsMounted(true);
@@ -82,7 +83,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     id: docData.id,
     code: docData.code,
     description: docData.description,
-    // unitOfMeasure: docData.unitOfMeasure, // Removido
     createdAt: docData.createdAt,
   } as SKU);
 
@@ -180,11 +180,11 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.log("Banco de dados já contém dados de SKUs.");
       return null; 
     }
-  }, []);
+  }, [toast]);
 
 
   const fetchData = useCallback(async () => {
-    if (!currentUser) { // Não buscar dados se não houver usuário logado
+    if (!currentUser) {
       console.log("FetchData: Nenhum usuário logado, não buscando dados.");
       setSkus([]);
       setProductionOrders([]);
@@ -193,7 +193,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     try {
       console.log("Buscando dados do Firestore...");
-      const seededData = await seedDatabase(); // O seedDatabase deve ser chamado antes de buscar os dados
+      const seededData = await seedDatabase();
 
       if (seededData) { 
         setSkus(seededData.skus.map(mapDocToSku));
@@ -231,7 +231,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setProductionOrders([]);
       setDemands([]);
     }
-  }, [toast, seedDatabase, currentUser]); // Adicionado currentUser à dependência
+  }, [toast, seedDatabase, currentUser]);
 
   useEffect(() => {
     if (isMounted && !authLoading) {
@@ -249,31 +249,45 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
   // Gerenciamento de SKU
-  const addSku = useCallback(async (skuData: Omit<SKU, 'id' | 'createdAt' | 'unitOfMeasure'>) => {
-    const newSkuId = uuidv4();
-    const newSku: SKU = { ...skuData, id: newSkuId, createdAt: new Date().toISOString() };
+  const addSku = useCallback(async (skuData: Omit<SKU, 'id' | 'createdAt'>) => {
+    // Normalizar código para comparação (opcional, mas recomendado para evitar duplicatas case-insensitive)
+    const normalizedCode = skuData.code.toUpperCase(); 
+    const q = query(collection(db, SKUS_COLLECTION), where("code", "==", normalizedCode));
+    
     try {
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        // SKU com este código já existe
+        console.error("Erro ao adicionar SKU: Código já existente.", normalizedCode);
+        throw new Error("DUPLICATE_SKU_CODE"); // Lançar um erro específico
+      }
+
+      const newSkuId = uuidv4();
+      // Salvar com o código original ou normalizado, dependendo da preferência
+      const newSku: SKU = { ...skuData, code: skuData.code, id: newSkuId, createdAt: new Date().toISOString() };
+      
       await setDoc(doc(db, SKUS_COLLECTION, newSku.id), newSku);
       setSkus(prev => [...prev, newSku]);
     } catch (error: any) {
-      console.error("Erro ao adicionar SKU:", newSku.id, error);
+      console.error("Erro ao adicionar SKU:", error);
       toast({
         title: "Erro ao Adicionar SKU",
-        description: `Não foi possível adicionar o SKU. ${error.message}`,
+        description: error.message === "DUPLICATE_SKU_CODE" ? "Código de SKU já existente." : `Não foi possível adicionar o SKU. ${error.message}`,
         variant: "destructive",
       });
       throw error; 
     }
   }, [toast]);
 
-  const updateSku = useCallback(async (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt' | 'unitOfMeasure'>>) => {
+  const updateSku = useCallback(async (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => {
     try {
       const skuRef = doc(db, SKUS_COLLECTION, skuId);
       await updateDoc(skuRef, skuData);
-      setSkus(prev => prev.map(s => s.id === skuId ? { ...s, ...skuData, code: skuData.code || s.code, description: skuData.description || s.description } as SKU : s));
+      setSkus(prev => prev.map(s => s.id === skuId ? { ...s, ...skuData } as SKU : s));
       const currentSku = skus.find(s => s.id === skuId);
-      toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || currentSku?.code} atualizado.`});
-    } catch (error: any)      {
+      // Não mostrar toast de sucesso aqui se o erro "not-found" for tratado abaixo
+      // toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || currentSku?.code} atualizado.`});
+    } catch (error: any) {
       const firebaseError = error as { code?: string };
       if (firebaseError.code === 'not-found') {
         console.error("Erro ao atualizar SKU: Documento não encontrado.", skuId, error);
@@ -292,7 +306,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
     }
-  }, [toast, skus]); // Adicionado skus à dependência
+  }, [toast, skus]);
 
   const deleteSku = useCallback(async (skuId: string) => {
     const skuToDelete = skus.find(s => s.id === skuId);
@@ -428,7 +442,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateProductionOrder = useCallback(async (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => {
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
-      // Filtrar campos undefined antes de enviar para updateDoc
       const updateData = Object.entries(poData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
           acc[key as keyof typeof poData] = value;
@@ -489,8 +502,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const updateData = { 
       status: 'Em Progresso' as ProductionOrderStatus, 
       startTime: new Date().toISOString(), 
-      endTime: null, // Usar null em vez de undefined
-      productionTime: null // Usar null em vez de undefined
+      endTime: null, 
+      productionTime: null 
     };
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
@@ -555,7 +568,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateDemand = useCallback(async (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => {
     try {
       const demandRef = doc(db, DEMANDS_COLLECTION, demandId);
-      // Filtrar campos undefined antes de enviar para updateDoc
       const updateData = Object.entries(demandData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
           acc[key as keyof typeof demandData] = value;
@@ -612,13 +624,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [demands]);
 
   const contextValue = useMemo(() => ({
-    skus, // Não condiciona mais à montagem aqui, pois o useEffect acima lida com isso
+    skus,
     addSku,
     updateSku,
     deleteSku,
     deleteSelectedSkus,
     findSkuById,
-    productionOrders, // Não condiciona mais à montagem aqui
+    productionOrders, 
     addProductionOrder,
     updateProductionOrder,
     deleteProductionOrder,
@@ -627,7 +639,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     stopProductionOrderTimer,
     findProductionOrderById,
     getProductionOrdersBySku,
-    demands, // Não condiciona mais à montagem aqui
+    demands, 
     addDemand,
     updateDemand,
     deleteDemand,
@@ -635,7 +647,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     findDemandBySkuAndMonth,
     isDataReady: isMounted && !authLoading && !!currentUser, 
   }), [
-    isMounted, authLoading, currentUser, // Adicionado authLoading e currentUser aqui também
+    isMounted, authLoading, currentUser,
     skus, productionOrders, demands,
     addSku, updateSku, deleteSku, deleteSelectedSkus, findSkuById,
     addProductionOrder, updateProductionOrder, deleteProductionOrder, deleteSelectedProductionOrders, 
@@ -653,3 +665,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+

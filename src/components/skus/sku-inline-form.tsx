@@ -41,13 +41,18 @@ export function SkuInlineForm() {
 
   const onSubmit = async (data: SkuInlineFormValues) => {
     try {
-      await addSku(data);
+      await addSku(data); // addSku agora pode lançar um erro
       toast({ title: "SKU Adicionado", description: `SKU ${data.code} adicionado com sucesso.` });
       form.reset();
     } catch (error: any) {
-      // O toast de erro já é tratado no AppContext ou na chamada de addSku.
-      // Não é necessário exibir outro toast aqui, a menos que queira uma mensagem específica para o formulário.
+      // O toast de erro já é tratado no AppContext se for um erro genérico.
+      // Se addSku lançar um erro específico como "DUPLICATE_SKU_CODE", 
+      // o toast no AppContext já mostrará a mensagem correta.
+      // Não é necessário exibir outro toast aqui, a menos que queira personalizar
+      // a mensagem para este formulário especificamente.
       console.error("Erro ao adicionar SKU (formulário inline):", error);
+      // Se for um erro de duplicidade, o toast do AppContext será exibido.
+      // Não resetar o formulário em caso de erro para o usuário poder corrigir.
     }
   };
 
@@ -95,3 +100,4 @@ export function SkuInlineForm() {
     </Card>
   );
 }
+
