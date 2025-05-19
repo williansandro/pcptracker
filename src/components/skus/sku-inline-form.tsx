@@ -16,8 +16,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/app-context";
 import React from "react";
-// useToast já é tratado no AppContext para addSku
-// import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -30,7 +28,6 @@ type SkuInlineFormValues = z.infer<typeof skuInlineFormSchema>;
 
 export function SkuInlineForm() {
   const { addSku } = useAppContext();
-  // const { toast } = useToast(); // Removido pois o toast de sucesso/erro é tratado no AppContext
 
   const form = useForm<SkuInlineFormValues>({
     resolver: zodResolver(skuInlineFormSchema),
@@ -41,17 +38,13 @@ export function SkuInlineForm() {
   });
 
   const onSubmit = async (data: SkuInlineFormValues) => {
-    try {
-      // O código já será salvo em maiúsculas se o input forçar,
-      // mas a verificação de duplicidade no AppContext também considera uppercase.
-      await addSku(data);
-      // O toast de sucesso é disparado pelo AppContext agora
+    // AppContext.addSku agora retorna boolean e trata seus próprios toasts
+    const success = await addSku({ ...data, code: data.code.toUpperCase() });
+    if (success) {
       form.reset(); // Limpar o formulário apenas em caso de sucesso
-    } catch (error: any) {
-      // O toast de erro (incluindo duplicidade) é disparado pelo AppContext.
-      // Não resetar o formulário em caso de erro para o usuário poder corrigir.
-      console.error("Erro ao adicionar SKU (formulário inline):", error.message);
     }
+    // Nenhuma necessidade de try/catch aqui, pois addSku não lança mais erros por validações esperadas
+    // e trata seus próprios toasts de erro.
   };
 
   return (

@@ -22,8 +22,6 @@ import {
   where,
   getCountFromServer,
   setDoc,
-  // deleteField, // Não usado atualmente
-  // documentId // Não usado atualmente
 } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/auth-context';
@@ -40,7 +38,7 @@ interface DeleteSelectedSkusResult {
 
 interface AppContextType {
   skus: SKU[];
-  addSku: (skuData: Omit<SKU, 'id' | 'createdAt'>) => Promise<void>;
+  addSku: (skuData: Omit<SKU, 'id' | 'createdAt'>) => Promise<boolean>; // Changed return type
   updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => Promise<void>;
   deleteSku: (skuId: string) => Promise<void>;
   deleteSelectedSkus: (skuIds: string[]) => Promise<DeleteSelectedSkusResult>;
@@ -68,9 +66,9 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [skus, setSkus] = useState<SKU[]>([]);
-  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
-  const [demands, setDemands] = useState<Demand[]>([]);
+  const [skusState, setSkus] = useState<SKU[]>([]);
+  const [productionOrdersState, setProductionOrders] = useState<ProductionOrder[]>([]);
+  const [demandsState, setDemands] = useState<Demand[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
@@ -139,7 +137,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           id: newPoId,
           skuId: skuForPo.id,
           status,
-          targetQuantity: poData.targetQuantity, // Adicionado para clareza
+          targetQuantity: poData.targetQuantity,
           producedQuantity: status === 'Concluída' ? poData.producedQuantity : undefined,
           startTime: status === 'Em Progresso' || status === 'Concluída' ? poData.startTime : null,
           endTime: status === 'Concluída' ? poData.endTime : null,
@@ -232,7 +230,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setProductionOrders([]);
       setDemands([]);
     }
-  }, [toast, seedDatabase, currentUser]);
+  }, [currentUser, seedDatabase, toast]);
 
   useEffect(() => {
     if (isMounted && !authLoading) {
@@ -250,36 +248,41 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
   // Gerenciamento de SKU
-  const addSku = useCallback(async (skuData: Omit<SKU, 'id' | 'createdAt'>) => {
+  const addSku = useCallback(async (skuData: Omit<SKU, 'id' | 'createdAt'>): Promise<boolean> => {
     const normalizedCode = skuData.code.toUpperCase();
     const q = query(collection(db, SKUS_COLLECTION), where("code", "==", normalizedCode));
 
     try {
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
-        // SKU com este código já existe
-        // console.error("Erro ao adicionar SKU: Código já existente.", normalizedCode); // Removido para evitar log no overlay de erro para validação
-        throw new Error("DUPLICATE_SKU_CODE");
+        toast({
+          title: "Erro ao Adicionar SKU",
+          description: "Código de SKU já existente.",
+          variant: "destructive",
+        });
+        return false; // Indicate failure (duplicate)
       }
 
       const newSkuId = uuidv4();
-      const newSku: SKU = { ...skuData, code: skuData.code, id: newSkuId, createdAt: new Date().toISOString() };
+      const newSku: SKU = { 
+        ...skuData, 
+        code: normalizedCode, // Use normalized code
+        id: newSkuId, 
+        createdAt: new Date().toISOString() 
+      };
       
       await setDoc(doc(db, SKUS_COLLECTION, newSku.id), newSku);
       setSkus(prev => [...prev, newSku].sort((a, b) => a.code.localeCompare(b.code)));
       toast({ title: "SKU Adicionado", description: `SKU ${newSku.code} adicionado com sucesso.` });
+      return true; // Indicate success
     } catch (error: any) {
-      console.error("Erro ao adicionar SKU:", error);
-      let description = `Não foi possível adicionar o SKU. ${(error as Error).message}`;
-      if (error.message === "DUPLICATE_SKU_CODE") {
-        description = "Código de SKU já existente.";
-      }
+      console.error("Erro na operação Firestore ao adicionar SKU:", error);
       toast({
         title: "Erro ao Adicionar SKU",
-        description: description,
+        description: (error as Error).message || "Não foi possível adicionar o SKU ao banco de dados.",
         variant: "destructive",
       });
-      throw error; 
+      return false; // Indicate failure (other error)
     }
   }, [toast]);
 
@@ -294,7 +297,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ).sort((a, b) => a.code.localeCompare(b.code))
       );
       
-      const currentSku = skus.find(s => s.id === skuId); // Use skus from closure
+      const currentSku = skusState.find(s => s.id === skuId);
       toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || currentSku?.code} atualizado.`});
 
     } catch (error: any) {
@@ -316,10 +319,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
     }
-  }, [toast, skus]);
+  }, [toast, skusState]);
 
   const deleteSku = useCallback(async (skuId: string) => {
-    const skuToDelete = skus.find(s => s.id === skuId);
+    const skuToDelete = skusState.find(s => s.id === skuId);
     if (!skuToDelete) {
         console.error("Tentativa de excluir SKU não encontrado no estado local:", skuId);
         toast({ title: "Erro Interno", description: "SKU não encontrado para exclusão.", variant: "destructive" });
@@ -329,45 +332,45 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const posQuery = query(collection(db, PRODUCTION_ORDERS_COLLECTION), where("skuId", "==", skuId));
     const demandsQuery = query(collection(db, DEMANDS_COLLECTION), where("skuId", "==", skuId));
 
-    const [posSnapshot, demandsSnapshot] = await Promise.all([
-        getCountFromServer(posQuery),
-        getCountFromServer(demandsQuery)
-    ]);
-    
-    const associatedPOsCount = posSnapshot.data().count;
-    const associatedDemandsCount = demandsSnapshot.data().count;
-
-    let reasons = [];
-    if (associatedPOsCount > 0) reasons.push("Ordens de Produção");
-    if (associatedDemandsCount > 0) reasons.push("Demandas");
-
-    if (reasons.length > 0) {
-      const errorMessage = `O SKU ${skuToDelete.code} não pode ser excluído pois possui ${reasons.join(' e ')} associada(s).`;
-      console.error(errorMessage);
-      // toast({ title: "Falha ao Excluir", description: errorMessage, variant: "destructive", duration: 7000 }); // Toast é lançado por quem chama
-      throw new Error(errorMessage); 
-    }
     try {
+      const [posSnapshot, demandsSnapshot] = await Promise.all([
+          getCountFromServer(posQuery),
+          getCountFromServer(demandsQuery)
+      ]);
+      
+      const associatedPOsCount = posSnapshot.data().count;
+      const associatedDemandsCount = demandsSnapshot.data().count;
+
+      let reasons = [];
+      if (associatedPOsCount > 0) reasons.push("Ordens de Produção");
+      if (associatedDemandsCount > 0) reasons.push("Demandas");
+
+      if (reasons.length > 0) {
+        const errorMessage = `O SKU ${skuToDelete.code} não pode ser excluído pois possui ${reasons.join(' e ')} associada(s).`;
+        // console.error(errorMessage); // Error is already part of the thrown message
+        throw new Error(errorMessage); 
+      }
+      
       await deleteDoc(doc(db, SKUS_COLLECTION, skuId));
       setSkus(prev => prev.filter(s => s.id !== skuId));
-      // toast({ title: "SKU Excluído", description: `SKU ${skuToDelete.code} excluído.` }); // Toast é lançado por quem chama
+      // O toast de sucesso é tratado por quem chama, no SkuActions
     } catch (error: any) {
-      console.error("Erro ao excluir SKU do Firestore:", skuId, error);
-      toast({
+      // console.error("Erro ao verificar/excluir SKU:", skuId, error); // Apenas relançar o erro
+      toast({ // Garantir que um toast de erro seja mostrado se a verificação falhar antes do SkuActions
         title: "Erro ao Excluir SKU",
-        description: (error as Error).message || "Não foi possível excluir o SKU do banco de dados.",
+        description: (error as Error).message || "Não foi possível excluir o SKU.",
         variant: "destructive",
       });
       throw error; 
     }
-  }, [skus, toast]);
+  }, [skusState, toast]);
 
   const deleteSelectedSkus = useCallback(async (skuIds: string[]): Promise<DeleteSelectedSkusResult> => {
     const skusToDeleteCompletely: string[] = [];
     const skusNotDeleted: { code: string; reason: string }[] = [];
     const batch = writeBatch(db);
     
-    const currentSkusState = skus; 
+    const currentSkusState = skusState; 
 
     for (const skuId of skuIds) {
       const sku = currentSkusState.find(s => s.id === skuId);
@@ -411,11 +414,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                  tempNotDeleted.push({code: skuFound.code, reason: "Erro no servidor durante exclusão"});
             }
          });
-         toast({
-            title: "Erro ao Excluir Alguns SKUs",
-            description: (error as Error).message || "Uma falha ocorreu ao tentar excluir alguns SKUs.",
-            variant: "destructive",
-         });
+         // Não mostrar toast aqui, SkuDataTable vai mostrar um toast agregado
          return { deletedCount: 0, notDeleted: tempNotDeleted };
       }
     }
@@ -424,9 +423,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       deletedCount: skusToDeleteCompletely.length,
       notDeleted: skusNotDeleted,
     };
-  }, [skus, toast]);
+  }, [skusState]); // Não depende de toast diretamente
 
-  const findSkuById = useCallback((skuId: string) => skus.find(s => s.id === skuId), [skus]);
+  const findSkuById = useCallback((skuId: string) => skusState.find(s => s.id === skuId), [skusState]);
 
   // Gerenciamento de Ordem de Produção
   const addProductionOrder = useCallback(async (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity' | 'startTime' | 'endTime' | 'productionTime'>) => {
@@ -458,7 +457,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (value !== undefined) {
           (acc as any)[key as keyof typeof poData] = value;
         } else {
-          // Explicitamente definir como null se o valor for undefined, para limpar campos
           (acc as any)[key as keyof typeof poData] = null;
         }
         return acc;
@@ -472,7 +470,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po)
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       );
-      toast({ title: "Ordem de Produção Atualizada", description: `OP ${poId.substring(0,8)} atualizada.`});
+      // toast({ title: "Ordem de Produção Atualizada", description: `OP ${poId.substring(0,8)} atualizada.`}); // Toast pode ser muito frequente
     } catch (error: any) {
       console.error("Erro ao atualizar Ordem de Produção:", poId, error);
       toast({
@@ -516,7 +514,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [toast]);
 
   const startProductionOrderTimer = useCallback(async (poId: string) => {
-    const poToUpdate = productionOrders.find(po => po.id === poId);
+    const poToUpdate = productionOrdersState.find(po => po.id === poId);
     if (poToUpdate?.status !== 'Aberta') {
         toast({ title: "Ação Inválida", description: "Só é possível iniciar OPs com status 'Aberta'.", variant: "default" });
         return;
@@ -524,8 +522,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const updateData = { 
       status: 'Em Progresso' as ProductionOrderStatus, 
       startTime: new Date().toISOString(), 
-      endTime: null, // Usar null em vez de undefined para o Firestore
-      productionTime: null // Usar null em vez de undefined
+      endTime: null, 
+      productionTime: null 
     };
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
@@ -542,10 +540,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         variant: "destructive",
       });
     }
-  }, [productionOrders, toast]);
+  }, [productionOrdersState, toast]);
 
   const stopProductionOrderTimer = useCallback(async (poId: string, producedQuantity: number) => {
-    const poToUpdate = productionOrders.find(po => po.id === poId);
+    const poToUpdate = productionOrdersState.find(po => po.id === poId);
     if (poToUpdate && poToUpdate.status === 'Em Progresso' && poToUpdate.startTime) {
       const endTime = new Date();
       const productionTime = Math.floor((endTime.getTime() - new Date(poToUpdate.startTime).getTime()) / 1000); 
@@ -568,10 +566,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.warn("Tentativa de parar timer para OP não elegível:", poId, poToUpdate?.status);
         toast({ title: "Ação Inválida", description: "Não foi possível finalizar esta OP. Verifique seu status.", variant: "default"});
     }
-  }, [productionOrders, toast]);
+  }, [productionOrdersState, toast]);
 
-  const findProductionOrderById = useCallback((poId: string) => productionOrders.find(po => po.id === poId), [productionOrders]);
-  const getProductionOrdersBySku = useCallback((skuId: string) => productionOrders.filter(po => po.skuId === skuId), [productionOrders]);
+  const findProductionOrderById = useCallback((poId: string) => productionOrdersState.find(po => po.id === poId), [productionOrdersState]);
+  const getProductionOrdersBySku = useCallback((skuId: string) => productionOrdersState.filter(po => po.skuId === skuId), [productionOrdersState]);
 
   // Gerenciamento de Demanda
   const addDemand = useCallback(async (demandData: Omit<Demand, 'id' | 'createdAt'>) => {
@@ -652,17 +650,17 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [toast]);
 
   const findDemandBySkuAndMonth = useCallback((skuId: string, monthYear: string) => {
-    return demands.find(d => d.skuId === skuId && d.monthYear === monthYear);
-  }, [demands]);
+    return demandsState.find(d => d.skuId === skuId && d.monthYear === monthYear);
+  }, [demandsState]);
 
   const contextValue = useMemo(() => ({
-    skus,
+    skus: skusState,
     addSku,
     updateSku,
     deleteSku,
     deleteSelectedSkus,
     findSkuById,
-    productionOrders, 
+    productionOrders: productionOrdersState, 
     addProductionOrder,
     updateProductionOrder,
     deleteProductionOrder,
@@ -671,7 +669,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     stopProductionOrderTimer,
     findProductionOrderById,
     getProductionOrdersBySku,
-    demands, 
+    demands: demandsState, 
     addDemand,
     updateDemand,
     deleteDemand,
@@ -680,7 +678,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     isDataReady: isMounted && !authLoading && !!currentUser, 
   }), [
     isMounted, authLoading, currentUser,
-    skus, productionOrders, demands,
+    skusState, productionOrdersState, demandsState,
     addSku, updateSku, deleteSku, deleteSelectedSkus, findSkuById,
     addProductionOrder, updateProductionOrder, deleteProductionOrder, deleteSelectedProductionOrders, 
     startProductionOrderTimer, stopProductionOrderTimer, findProductionOrderById, getProductionOrdersBySku,
@@ -697,4 +695,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
