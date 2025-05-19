@@ -22,8 +22,8 @@ import {
   where,
   getCountFromServer,
   setDoc,
-  deleteField,
-  documentId
+  // deleteField, // Não usado atualmente
+  // documentId // Não usado atualmente
 } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/auth-context';
@@ -139,6 +139,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           id: newPoId,
           skuId: skuForPo.id,
           status,
+          targetQuantity: poData.targetQuantity, // Adicionado para clareza
           producedQuantity: status === 'Concluída' ? poData.producedQuantity : undefined,
           startTime: status === 'Em Progresso' || status === 'Concluída' ? poData.startTime : null,
           endTime: status === 'Concluída' ? poData.endTime : null,
@@ -180,7 +181,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.log("Banco de dados já contém dados de SKUs.");
       return null; 
     }
-  }, [toast]);
+  }, []);
 
 
   const fetchData = useCallback(async () => {
@@ -250,29 +251,32 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Gerenciamento de SKU
   const addSku = useCallback(async (skuData: Omit<SKU, 'id' | 'createdAt'>) => {
-    // Normalizar código para comparação (opcional, mas recomendado para evitar duplicatas case-insensitive)
-    const normalizedCode = skuData.code.toUpperCase(); 
+    const normalizedCode = skuData.code.toUpperCase();
     const q = query(collection(db, SKUS_COLLECTION), where("code", "==", normalizedCode));
-    
+
     try {
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
         // SKU com este código já existe
-        console.error("Erro ao adicionar SKU: Código já existente.", normalizedCode);
-        throw new Error("DUPLICATE_SKU_CODE"); // Lançar um erro específico
+        // console.error("Erro ao adicionar SKU: Código já existente.", normalizedCode); // Removido para evitar log no overlay de erro para validação
+        throw new Error("DUPLICATE_SKU_CODE");
       }
 
       const newSkuId = uuidv4();
-      // Salvar com o código original ou normalizado, dependendo da preferência
       const newSku: SKU = { ...skuData, code: skuData.code, id: newSkuId, createdAt: new Date().toISOString() };
       
       await setDoc(doc(db, SKUS_COLLECTION, newSku.id), newSku);
-      setSkus(prev => [...prev, newSku]);
+      setSkus(prev => [...prev, newSku].sort((a, b) => a.code.localeCompare(b.code)));
+      toast({ title: "SKU Adicionado", description: `SKU ${newSku.code} adicionado com sucesso.` });
     } catch (error: any) {
       console.error("Erro ao adicionar SKU:", error);
+      let description = `Não foi possível adicionar o SKU. ${(error as Error).message}`;
+      if (error.message === "DUPLICATE_SKU_CODE") {
+        description = "Código de SKU já existente.";
+      }
       toast({
         title: "Erro ao Adicionar SKU",
-        description: error.message === "DUPLICATE_SKU_CODE" ? "Código de SKU já existente." : `Não foi possível adicionar o SKU. ${error.message}`,
+        description: description,
         variant: "destructive",
       });
       throw error; 
@@ -283,10 +287,16 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const skuRef = doc(db, SKUS_COLLECTION, skuId);
       await updateDoc(skuRef, skuData);
-      setSkus(prev => prev.map(s => s.id === skuId ? { ...s, ...skuData } as SKU : s));
-      const currentSku = skus.find(s => s.id === skuId);
-      // Não mostrar toast de sucesso aqui se o erro "not-found" for tratado abaixo
-      // toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || currentSku?.code} atualizado.`});
+      
+      setSkus(prev => 
+        prev.map(s => 
+          s.id === skuId ? { ...s, ...skuData } as SKU : s
+        ).sort((a, b) => a.code.localeCompare(b.code))
+      );
+      
+      const currentSku = skus.find(s => s.id === skuId); // Use skus from closure
+      toast({ title: "SKU Atualizado", description: `SKU ${skuData.code || currentSku?.code} atualizado.`});
+
     } catch (error: any) {
       const firebaseError = error as { code?: string };
       if (firebaseError.code === 'not-found') {
@@ -334,12 +344,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (reasons.length > 0) {
       const errorMessage = `O SKU ${skuToDelete.code} não pode ser excluído pois possui ${reasons.join(' e ')} associada(s).`;
       console.error(errorMessage);
-      toast({ title: "Falha ao Excluir", description: errorMessage, variant: "destructive", duration: 7000 });
+      // toast({ title: "Falha ao Excluir", description: errorMessage, variant: "destructive", duration: 7000 }); // Toast é lançado por quem chama
       throw new Error(errorMessage); 
     }
     try {
       await deleteDoc(doc(db, SKUS_COLLECTION, skuId));
       setSkus(prev => prev.filter(s => s.id !== skuId));
+      // toast({ title: "SKU Excluído", description: `SKU ${skuToDelete.code} excluído.` }); // Toast é lançado por quem chama
     } catch (error: any) {
       console.error("Erro ao excluir SKU do Firestore:", skuId, error);
       toast({
@@ -428,7 +439,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
     try {
       await setDoc(doc(db, PRODUCTION_ORDERS_COLLECTION, newPo.id), newPo);
-      setProductionOrders(prev => [...prev, newPo]);
+      setProductionOrders(prev => [...prev, newPo].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      toast({ title: "Ordem de Produção Adicionada", description: "Nova OP criada com sucesso." });
     } catch (error: any) {
       console.error("Erro ao adicionar Ordem de Produção:", newPo.id, error);
       toast({
@@ -444,15 +456,23 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
       const updateData = Object.entries(poData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
-          acc[key as keyof typeof poData] = value;
+          (acc as any)[key as keyof typeof poData] = value;
+        } else {
+          // Explicitamente definir como null se o valor for undefined, para limpar campos
+          (acc as any)[key as keyof typeof poData] = null;
         }
         return acc;
-      }, {} as any);
+      }, {} as Partial<ProductionOrder>);
+
 
       if (Object.keys(updateData).length > 0) {
         await updateDoc(poRef, updateData);
       }
-      setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po));
+      setProductionOrders(prev => 
+        prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po)
+        .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      );
+      toast({ title: "Ordem de Produção Atualizada", description: `OP ${poId.substring(0,8)} atualizada.`});
     } catch (error: any) {
       console.error("Erro ao atualizar Ordem de Produção:", poId, error);
       toast({
@@ -467,6 +487,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       await deleteDoc(doc(db, PRODUCTION_ORDERS_COLLECTION, poId));
       setProductionOrders(prev => prev.filter(po => po.id !== poId));
+      toast({ title: "Ordem de Produção Excluída", description: `OP ${poId.substring(0,8)} excluída.`});
     } catch (error: any) {
       console.error("Erro ao excluir Ordem de Produção:", poId, error);
        toast({
@@ -483,6 +504,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       await batch.commit();
       setProductionOrders(prev => prev.filter(po => !poIds.includes(po.id)));
+      toast({ title: "OPs Excluídas", description: `${poIds.length} ordem(ns) de produção excluída(s).`});
     } catch (error: any) {
       console.error("Erro ao excluir Ordens de Produção em lote:", error);
       toast({
@@ -502,15 +524,16 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const updateData = { 
       status: 'Em Progresso' as ProductionOrderStatus, 
       startTime: new Date().toISOString(), 
-      endTime: null, 
-      productionTime: null 
+      endTime: null, // Usar null em vez de undefined para o Firestore
+      productionTime: null // Usar null em vez de undefined
     };
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
       await updateDoc(poRef, updateData);
       setProductionOrders(prev => prev.map(po =>
         po.id === poId ? { ...po, ...updateData } as ProductionOrder : po
-      ));
+      ).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      toast({ title: "Produção Iniciada", description: `Timer iniciado para OP ${poId.substring(0,8)}.` });
     } catch (error: any) {
       console.error("Erro ao iniciar timer da OP:", poId, error);
        toast({
@@ -530,7 +553,9 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
         await updateDoc(poRef, updateData);
-        setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po));
+        setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po)
+        .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        toast({ title: "Produção Concluída", description: `OP ${poId.substring(0,8)} finalizada.` });
       } catch (error: any) {
         console.error("Erro ao parar timer da OP:", poId, error);
         toast({
@@ -554,7 +579,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const newDemand: Demand = { ...demandData, id: newDemandId, createdAt: new Date().toISOString() };
     try {
       await setDoc(doc(db, DEMANDS_COLLECTION, newDemand.id), newDemand);
-      setDemands(prev => [...prev, newDemand]);
+      setDemands(prev => [...prev, newDemand].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      toast({ title: "Demanda Adicionada", description: "Nova demanda mensal adicionada."});
     } catch (error: any) {
       console.error("Erro ao adicionar Demanda:", newDemand.id, error);
       toast({
@@ -570,15 +596,19 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const demandRef = doc(db, DEMANDS_COLLECTION, demandId);
       const updateData = Object.entries(demandData).reduce((acc, [key, value]) => {
         if (value !== undefined) {
-          acc[key as keyof typeof demandData] = value;
+          (acc as any)[key as keyof typeof demandData] = value;
+        } else {
+          (acc as any)[key as keyof typeof demandData] = null;
         }
         return acc;
-      }, {} as any);
+      }, {} as Partial<Demand>);
 
       if (Object.keys(updateData).length > 0) {
         await updateDoc(demandRef, updateData);
       }
-      setDemands(prev => prev.map(d => d.id === demandId ? { ...d, ...updateData } as Demand : d));
+      setDemands(prev => prev.map(d => d.id === demandId ? { ...d, ...updateData } as Demand : d)
+      .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      toast({ title: "Demanda Atualizada", description: `Demanda ${demandId.substring(0,8)} atualizada.`});
     } catch (error: any) {
       console.error("Erro ao atualizar Demanda:", demandId, error);
       toast({
@@ -593,6 +623,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       await deleteDoc(doc(db, DEMANDS_COLLECTION, demandId));
       setDemands(prev => prev.filter(d => d.id !== demandId));
+      toast({ title: "Demanda Excluída", description: `Demanda ${demandId.substring(0,8)} excluída.`});
     } catch (error: any) {
       console.error("Erro ao excluir Demanda:", demandId, error);
        toast({
@@ -609,6 +640,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       await batch.commit();
       setDemands(prev => prev.filter(d => !demandIds.includes(d.id)));
+      toast({ title: "Demandas Excluídas", description: `${demandIds.length} demanda(s) excluída(s).`});
     } catch (error: any) {
       console.error("Erro ao excluir Demandas em lote:", error);
       toast({
