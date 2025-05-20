@@ -50,12 +50,12 @@ interface AppContextType {
   deleteProductionOrder: (poId: string) => Promise<void>;
   deleteSelectedProductionOrders: (poIds: string[]) => Promise<void>;
   startProductionOrderTimer: (poId: string) => Promise<void>;
-  stopProductionOrderTimer: (poId: string, producedQuantity: number, deductLunchBreak?: boolean) => Promise<void>; // Parâmetro adicionado
+  stopProductionOrderTimer: (poId: string, producedQuantity: number, deductLunchBreak?: boolean) => Promise<void>;
   findProductionOrderById: (poId: string) => ProductionOrder | undefined;
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[];
 
   demands: Demand[];
-  addDemand: (demandData: Omit<Demand, 'id' | 'createdAt'>) => Promise<void>;
+  addDemand: (demandData: Omit<Demand, 'id' | 'createdAt'>) => Promise<boolean>;
   updateDemand: (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => Promise<void>;
   deleteDemand: (demandId: string) => Promise<void>;
   deleteSelectedDemands: (demandIds: string[]) => Promise<void>;
@@ -72,6 +72,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
+
 
   const mapDocToSku = useCallback((docData: any): SKU => ({
     id: docData.id,
@@ -222,9 +223,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         description: `Não foi possível carregar os dados do banco. ${error.message}`,
         variant: "destructive",
       });
-      setSkus([]);
-      setProductionOrders([]);
-      setDemands([]);
+      // Não limpar os dados aqui, pois pode haver dados já carregados de uma sessão anterior
+      // e a falha pode ser temporária. A UI deve mostrar que está tentando carregar ou mostrar os dados antigos.
     }
   }, [currentUser, seedDatabase, toast, mapDocToSku, mapDocToProductionOrder, mapDocToDemand]);
 
@@ -347,17 +347,21 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       if (reasons.length > 0) {
         const errorMessage = `O SKU ${skuToDelete.code} não pode ser excluído pois possui ${reasons.join(' e ')} associada(s).`;
+        toast({ title: "Falha na Exclusão", description: errorMessage, variant: "destructive" });
         throw new Error(errorMessage);
       }
 
       await deleteDoc(doc(db, SKUS_COLLECTION, skuId));
       setSkus(prev => prev.filter(s => s.id !== skuId));
+      toast({ title: "SKU Excluído", description: `SKU ${skuToDelete.code} excluído com sucesso.` });
     } catch (error: any) {
-      toast({
-        title: "Erro ao Excluir SKU",
-        description: (error as Error).message || "Não foi possível excluir o SKU.",
-        variant: "destructive",
-      });
+      if (!(error instanceof Error && error.message.startsWith("O SKU"))) {
+        toast({
+          title: "Erro ao Excluir SKU",
+          description: (error as Error).message || "Não foi possível excluir o SKU.",
+          variant: "destructive",
+        });
+      }
       throw error;
     }
   }, [skus, toast]);
@@ -417,7 +421,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       deletedCount: skusToDeleteCompletely.length,
       notDeleted: skusNotDeleted,
     };
-  }, [skus]);
+  }, [skus, toast]);
 
   const findSkuById = useCallback((skuId: string) => skus.find(s => s.id === skuId), [skus]);
 
@@ -450,7 +454,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (value !== undefined) {
           (acc as any)[key as keyof typeof poData] = value;
         } else {
-          (acc as any)[key as keyof typeof poData] = null; // Enviar null se o valor for explicitamente undefined
+          (acc as any)[key as keyof typeof poData] = null; 
         }
         return acc;
       }, {} as Partial<ProductionOrder>);
@@ -541,10 +545,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       let productionTimeSeconds = Math.floor((endTime.getTime() - new Date(poToUpdate.startTime).getTime()) / 1000);
       
       if (deductLunchBreak) {
-        productionTimeSeconds -= 3600; // Subtrai 60 minutos em segundos
+        productionTimeSeconds -= 3600; 
       }
-      // Garante que o tempo de produção não seja negativo
-      productionTimeSeconds = Math.max(0, productionTimeSeconds); 
       
       const updateData = { 
         status: 'Concluída' as ProductionOrderStatus, 
@@ -575,13 +577,24 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const findProductionOrderById = useCallback((poId: string) => productionOrders.find(po => po.id === poId), [productionOrders]);
   const getProductionOrdersBySku = useCallback((skuId: string) => productionOrders.filter(po => po.skuId === skuId), [productionOrders]);
 
-  const addDemand = useCallback(async (demandData: Omit<Demand, 'id' | 'createdAt'>) => {
+  const addDemand = useCallback(async (demandData: Omit<Demand, 'id' | 'createdAt'>): Promise<boolean> => {
+    const existingDemand = demands.find(d => d.skuId === demandData.skuId && d.monthYear === demandData.monthYear);
+    if (existingDemand) {
+      toast({
+        title: "Demanda Duplicada",
+        description: `Já existe uma demanda para este SKU no mês ${demandData.monthYear}.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+
     const newDemandId = uuidv4();
     const newDemand: Demand = { ...demandData, id: newDemandId, createdAt: new Date().toISOString() };
     try {
       await setDoc(doc(db, DEMANDS_COLLECTION, newDemand.id), newDemand);
       setDemands(prev => [...prev, newDemand].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       toast({ title: "Demanda Adicionada", description: "Nova demanda mensal adicionada."});
+      return true;
     } catch (error: any) {
       console.error("Erro ao adicionar Demanda:", newDemand.id, error);
       toast({
@@ -589,10 +602,30 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         description: `Não foi possível adicionar a Demanda. ${(error as Error).message}`,
         variant: "destructive",
       });
+      return false;
     }
-  }, [toast]);
+  }, [demands, toast]);
 
   const updateDemand = useCallback(async (demandId: string, demandData: Partial<Omit<Demand, 'id' | 'createdAt'>>) => {
+    const demandToUpdate = demands.find(d => d.id === demandId);
+    if (!demandToUpdate) return;
+
+    // Verifica duplicidade se skuId ou monthYear estão sendo alterados
+    const newSkuId = demandData.skuId || demandToUpdate.skuId;
+    const newMonthYear = demandData.monthYear || demandToUpdate.monthYear;
+    
+    if (demandData.skuId || demandData.monthYear) { // Apenas checa se os campos que definem a unicidade foram alterados
+        const existingDemand = demands.find(d => d.id !== demandId && d.skuId === newSkuId && d.monthYear === newMonthYear);
+        if (existingDemand) {
+            toast({
+                title: "Demanda Duplicada",
+                description: `Já existe uma demanda para o SKU ${findSkuById(newSkuId)?.code || 'N/D'} no mês ${newMonthYear}.`,
+                variant: "destructive",
+            });
+            return;
+        }
+    }
+
     try {
       const demandRef = doc(db, DEMANDS_COLLECTION, demandId);
       const updateData = Object.entries(demandData).reduce((acc, [key, value]) => {
@@ -609,7 +642,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       setDemands(prev => prev.map(d => d.id === demandId ? { ...d, ...updateData } as Demand : d)
       .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      toast({ title: "Demanda Atualizada", description: `Demanda ${demandId.substring(0,8)} atualizada.`});
+      toast({ title: "Demanda Atualizada", description: `Demanda atualizada.`});
     } catch (error: any) {
       console.error("Erro ao atualizar Demanda:", demandId, error);
       toast({
@@ -618,13 +651,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [demands, toast, findSkuById]);
 
   const deleteDemand = useCallback(async (demandId: string) => {
     try {
       await deleteDoc(doc(db, DEMANDS_COLLECTION, demandId));
       setDemands(prev => prev.filter(d => d.id !== demandId));
-      toast({ title: "Demanda Excluída", description: `Demanda ${demandId.substring(0,8)} excluída.`});
+      toast({ title: "Demanda Excluída", description: `Demanda excluída.`});
     } catch (error: any) {
       console.error("Erro ao excluir Demanda:", demandId, error);
        toast({
@@ -698,3 +731,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
