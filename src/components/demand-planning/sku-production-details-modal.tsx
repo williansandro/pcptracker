@@ -47,16 +47,14 @@ export function SkuProductionDetailsModal({
   isOpen,
   onClose,
   sku,
-  productionOrders, // Esta lista já deve ser a de OPs apenas para o SKU em questão
+  productionOrders,
 }: SkuProductionDetailsModalProps) {
 
   const relevantPOs = useMemo(() => {
-    // A prop 'productionOrders' já deve ser a lista filtrada para o SKU atual.
-    // Se o sku não estiver definido, ou a lista de productionOrders estiver vazia, retorna array vazio.
     if (!sku) {
       return [];
     }
-    return productionOrders; // Usar diretamente a prop que já deve vir filtrada.
+    return productionOrders || [];
   }, [sku, productionOrders]);
 
   const summary = useMemo(() => {
@@ -107,7 +105,7 @@ export function SkuProductionDetailsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl bg-card text-card-foreground">
         <DialogHeader>
           <DialogTitle>Detalhes de Produção para SKU: <span className="text-primary">{sku.code}</span></DialogTitle>
           <DialogDescription>{sku.description}</DialogDescription>
@@ -136,6 +134,11 @@ export function SkuProductionDetailsModal({
                     <p className="text-muted-foreground">Tempo Médio Prod.</p>
                     <p className="font-semibold text-lg">{summary.avgProductionTimeFormatted}</p>
                   </div>
+                  {relevantPOs.length === 0 && (
+                    <p className="text-sm text-muted-foreground col-span-full text-center py-2">
+                      Nenhuma Ordem de Produção encontrada para este SKU.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -153,6 +156,8 @@ export function SkuProductionDetailsModal({
                           <RechartsTooltip
                             cursor={{ fill: "hsl(var(--muted))" }}
                             content={<ChartTooltipContent hideLabel />}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} // Garante que tooltip use cores do card
+                            itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                           />
                           <Pie
                             data={statusDistributionData}
@@ -219,51 +224,55 @@ export function SkuProductionDetailsModal({
               </Card>
             </div>
 
-            {relevantPOs.length > 0 && (
-              <Card>
+            <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Lista de Ordens de Produção</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="p-2 text-left font-semibold text-muted-foreground">Status</th>
-                          <th className="p-2 text-right font-semibold text-muted-foreground">Meta</th>
-                          <th className="p-2 text-right font-semibold text-muted-foreground">Produzido</th>
-                          <th className="p-2 text-left font-semibold text-muted-foreground">Início</th>
-                          <th className="p-2 text-left font-semibold text-muted-foreground">Término</th>
-                          <th className="p-2 text-right font-semibold text-muted-foreground">Tempo Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {relevantPOs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(po => (
-                          <tr key={po.id} className="border-b border-border hover:bg-muted/30">
-                            <td className="p-2">
-                               <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium",
-                                po.status === 'Concluída' ? 'bg-green-500/20 text-green-300' : // Ajustado para tema escuro
-                                po.status === 'Em Progresso' ? 'bg-yellow-500/20 text-yellow-300' : // Ajustado para tema escuro
-                                po.status === 'Aberta' ? 'bg-blue-500/20 text-blue-300' : // Ajustado para tema escuro
-                                po.status === 'Cancelada' ? 'bg-red-500/20 text-red-300' : // Ajustado para tema escuro
-                                'bg-gray-500/20 text-gray-300' // Ajustado para tema escuro
-                              )}>
-                                {po.status}
-                              </span>
-                            </td>
-                            <td className="p-2 text-right">{po.targetQuantity.toLocaleString('pt-BR')}</td>
-                            <td className="p-2 text-right">{po.producedQuantity?.toLocaleString('pt-BR') || '-'}</td>
-                            <td className="p-2"><ClientSideDateTime dateString={po.startTime} outputFormat="dd/MM, HH:mm" locale={ptBR} placeholder="-" /></td>
-                            <td className="p-2"><ClientSideDateTime dateString={po.endTime} outputFormat="dd/MM, HH:mm" locale={ptBR} placeholder="-" /></td>
-                            <td className="p-2 text-right">{po.productionTime ? formatDuration(po.productionTime) : '-'}</td>
+                  {relevantPOs.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="p-2 text-left font-semibold text-muted-foreground">Status</th>
+                            <th className="p-2 text-right font-semibold text-muted-foreground">Meta</th>
+                            <th className="p-2 text-right font-semibold text-muted-foreground">Produzido</th>
+                            <th className="p-2 text-left font-semibold text-muted-foreground">Início</th>
+                            <th className="p-2 text-left font-semibold text-muted-foreground">Término</th>
+                            <th className="p-2 text-right font-semibold text-muted-foreground">Tempo Total</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {relevantPOs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(po => (
+                            <tr key={po.id} className="border-b border-border hover:bg-muted/30">
+                              <td className="p-2">
+                                 <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium",
+                                  po.status === 'Concluída' ? 'bg-green-700/30 text-green-300' :
+                                  po.status === 'Em Progresso' ? 'bg-yellow-700/30 text-yellow-300' :
+                                  po.status === 'Aberta' ? 'bg-blue-700/30 text-blue-300' :
+                                  po.status === 'Cancelada' ? 'bg-red-700/30 text-red-300' :
+                                  'bg-gray-700/30 text-gray-300'
+                                )}>
+                                  {po.status}
+                                </span>
+                              </td>
+                              <td className="p-2 text-right">{po.targetQuantity.toLocaleString('pt-BR')}</td>
+                              <td className="p-2 text-right">{po.producedQuantity?.toLocaleString('pt-BR') || '-'}</td>
+                              <td className="p-2"><ClientSideDateTime dateString={po.startTime} outputFormat="dd/MM, HH:mm" locale={ptBR} placeholder="-" /></td>
+                              <td className="p-2"><ClientSideDateTime dateString={po.endTime} outputFormat="dd/MM, HH:mm" locale={ptBR} placeholder="-" /></td>
+                              <td className="p-2 text-right">{po.productionTime ? formatDuration(po.productionTime) : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                     <p className="text-center text-sm text-muted-foreground py-10">
+                      Nenhuma Ordem de Produção cadastrada para este SKU.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
-            )}
           </div>
         </ScrollArea>
         <DialogFooter>
@@ -273,5 +282,3 @@ export function SkuProductionDetailsModal({
     </Dialog>
   );
 }
-
-    
