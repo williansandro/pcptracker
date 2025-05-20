@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,7 @@ interface SkuProductionDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   sku: SKU | null;
-  productionOrders: ProductionOrder[]; // Esta prop já deve vir filtrada para o SKU
+  productionOrders: ProductionOrder[]; // Esta prop DEVE vir filtrada para o SKU
 }
 
 const STATUS_COLORS_MODAL: Record<ProductionOrderStatus, string> = {
@@ -47,15 +47,25 @@ export function SkuProductionDetailsModal({
   isOpen,
   onClose,
   sku,
-  productionOrders,
+  productionOrders, // Espera-se que esta lista já esteja filtrada para o SKU em questão
 }: SkuProductionDetailsModalProps) {
 
-  const relevantPOs = useMemo(() => {
-    if (!sku) {
-      return [];
+  useEffect(() => {
+    if (isOpen && sku) {
+      console.log("[SkuProductionDetailsModal] Opened for SKU:", sku.code, "(ID:", sku.id, ")");
+      console.log("[SkuProductionDetailsModal] Received productionOrders prop:", productionOrders);
     }
-    return productionOrders || [];
-  }, [sku, productionOrders]);
+  }, [isOpen, sku, productionOrders]);
+
+  const relevantPOs = useMemo(() => {
+    // A prop productionOrders já deve vir filtrada pelo SKU
+    // Não é necessário filtrar novamente por sku.id aqui, a menos que a prop não seja confiável.
+    // Se productionOrders não vier filtrada, então um filtro aqui seria:
+    // if (!sku) return [];
+    // return (productionOrders || []).filter(po => po.skuId === sku.id);
+    return productionOrders || []; // Assumindo que a prop productionOrders já está corretamente filtrada.
+  }, [productionOrders]);
+
 
   const summary = useMemo(() => {
     if (!sku) return null;
@@ -156,7 +166,7 @@ export function SkuProductionDetailsModal({
                           <RechartsTooltip
                             cursor={{ fill: "hsl(var(--muted))" }}
                             content={<ChartTooltipContent hideLabel />}
-                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} // Garante que tooltip use cores do card
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
                             itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                           />
                           <Pie
@@ -282,3 +292,6 @@ export function SkuProductionDetailsModal({
     </Dialog>
   );
 }
+
+
+    
