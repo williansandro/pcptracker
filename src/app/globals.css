@@ -5,58 +5,57 @@
 
 @layer base {
   :root {
-    /* Dark Theme as Default */
-    --background: 220 40% 5%; /* Deep Dark Blue */
-    --foreground: 210 20% 95%; /* Light Gray / Off-white */
+    /* Light Theme for Content Area */
+    --background: 0 0% 96%; /* Very light gray */
+    --foreground: 240 10% 10%; /* Dark gray/black text */
 
-    --muted: 220 30% 15%; /* Darker Muted Blue */
-    --muted-foreground: 210 15% 65%; /* Lighter Gray for muted text */
+    --muted: 220 20% 92%; /* Light muted gray for backgrounds */
+    --muted-foreground: 240 5% 45%; /* Medium gray for muted text */
 
-    --popover: 220 35% 7%; /* Slightly lighter dark blue for popovers */
-    --popover-foreground: 210 20% 95%;
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 240 10% 10%;
 
-    --card: 220 30% 9%; /* Dark Blue for cards, slightly off from background */
-    --card-foreground: 210 20% 95%;
+    --card: 0 0% 100%; /* White for cards */
+    --card-foreground: 240 10% 10%;
 
-    --border: 220 25% 18%; /* Subtle border color */
-    --input: 220 25% 12%; /* Input background */
+    --border: 220 15% 88%; /* Light gray border */
+    --input: 0 0% 100%; /* White input background with border */
 
-    --primary: 205 90% 60%; /* Bright Cyan/Light Blue for primary actions & SKU text */
-    --primary-foreground: 220 40% 5%; /* Dark text on primary (if needed, usually primary is text color) */
+    --primary: 35 95% 55%; /* Orange/Yellow (e.g. from "Check now" button) */
+    --primary-foreground: 0 0% 100%; /* White text on primary */
 
-    --secondary: 220 20% 20%; /* Secondary elements background */
-    --secondary-foreground: 210 15% 75%;
+    --secondary: 220 15% 90%; /* Lighter gray for secondary elements bg */
+    --secondary-foreground: 240 10% 25%; /* Darker gray text on secondary */
 
-    --accent: 145 65% 55%; /* Vibrant Green for Seg/Unidade & other accents */
-    --accent-foreground: 220 40% 5%; /* Dark text on accent */
+    --accent: 210 85% 58%; /* Medium Blue */
+    --accent-foreground: 0 0% 100%; /* White text on accent */
 
     --destructive: 0 70% 55%; /* Red for destructive actions */
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 205 90% 65%; /* Ring color for focus, matches primary */
+    --ring: 35 90% 50%; /* Orange/Yellow for focus rings */
     --radius: 0.5rem;
 
-    --chart-1: 205 80% 55%; /* Cyan/Blue */
-    --chart-2: 260 80% 65%; /* Purple */
-    --chart-3: 30 90% 60%;  /* Orange */
-    --chart-4: 145 70% 50%; /* Green */
-    --chart-5: 350 85% 65%; /* Pink/Magenta */
+    /* Chart colors for light theme */
+    --chart-1: 35 100% 60%;  /* Orange */
+    --chart-2: 210 80% 60%;  /* Blue */
+    --chart-3: 260 70% 65%;  /* Purple */
+    --chart-4: 145 55% 50%;  /* Green (slightly desaturated for light theme) */
+    --chart-5: 350 80% 70%;  /* Pink */
 
-    /* Sidebar specific theme variables for dark theme */
-    --sidebar-background: 220 35% 7%; /* Darker than main bg for contrast or same as popover */
-    --sidebar-foreground: 210 15% 80%;
-    --sidebar-primary: 205 90% 60%; /* Primary text/icons in sidebar */
+    /* Sidebar specific theme variables (Dark Sidebar) */
+    --sidebar-background: 220 40% 18%; /* Dark Indigo/Blue */
+    --sidebar-foreground: 210 30% 85%; /* Off-white/Light Gray for text/icons */
+    --sidebar-primary: 205 90% 60%; /* Not heavily used, but a fallback accent */
     --sidebar-primary-foreground: 210 20% 95%;
-    --sidebar-accent: 220 40% 12%; /* Accent for active item background (subtle) */
-    --sidebar-accent-foreground: 205 90% 70%; /* Active item text color (brighter primary) */
-    --sidebar-border: 220 25% 15%;
+    --sidebar-accent: 220 30% 28%; /* Active item background - slightly lighter dark blue */
+    --sidebar-accent-foreground: 0 0% 100%; /* Active item text - white */
+    --sidebar-border: 220 25% 22%; /* Border color within sidebar */
     --sidebar-ring: 205 90% 65%;
   }
 
-  .dark {
-    /* This block can be removed if dark is the only theme, or used for a light theme override if needed later */
-    /* For now, :root defines the dark theme */
-  }
+  /* Remove .dark class if light is the only theme for content, or define specific .dark overrides here */
+  /* For now, :root defines the light theme for content */
 }
 
 @layer base {
@@ -68,13 +67,13 @@
   }
 }
 
-/* Custom Progress Bar Colors - Ensure they work on dark bg */
+/* Custom Progress Bar Colors - Ensure they work on light card bg */
 @layer components {
   .progress-bar-red > div {
     @apply bg-red-500;
   }
   .progress-bar-yellow > div {
-    @apply bg-yellow-400; /* Brighter yellow for dark theme */
+    @apply bg-yellow-500; /* Standard yellow, should be fine on white */
   }
   .progress-bar-green > div {
     @apply bg-green-500;
@@ -82,13 +81,4 @@
   .progress-bar-blue > div {
     @apply bg-blue-500;
   }
-
-  /* Colored Metric Cards - No longer used, cards will use default dark card style */
-  /* Remove or comment out if not needed */
-  /*
-  .metric-card-purple { ... }
-  .metric-card-blue { ... }
-  .metric-card-orange { ... }
-  .metric-card-teal { ... }
-  */
 }

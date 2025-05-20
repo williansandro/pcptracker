@@ -113,16 +113,16 @@ export const getDemandColumns = (
 
         if (progressPercentage > 100) {
           progressBarClass = "progress-bar-blue";
-          textColorClass = "text-blue-400"; // Adjusted for dark theme
+          textColorClass = "text-blue-600"; 
         } else if (progressPercentage >= 90) {
           progressBarClass = "progress-bar-green";
-          textColorClass = "text-green-400"; // Adjusted for dark theme
+          textColorClass = "text-green-600";
         } else if (progressPercentage >= 70) {
           progressBarClass = "progress-bar-yellow";
-          textColorClass = "text-yellow-400"; // Adjusted for dark theme
+          textColorClass = "text-yellow-600";
         } else {
           progressBarClass = "progress-bar-red";
-          textColorClass = "text-red-400"; // Adjusted for dark theme
+          textColorClass = "text-red-600";
         }
         
         return (

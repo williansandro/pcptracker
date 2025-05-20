@@ -91,16 +91,16 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
 
         if (percentage > 100) {
           progressBarClass = "progress-bar-blue";
-          textColorClass = "text-blue-400"; // Adjusted for dark theme
+          textColorClass = "text-blue-600"; // Darker blue for light theme
         } else if (percentage >= 90) {
           progressBarClass = "progress-bar-green";
-          textColorClass = "text-green-400"; // Adjusted for dark theme
+          textColorClass = "text-green-600"; // Darker green for light theme
         } else if (percentage >= 70) {
           progressBarClass = "progress-bar-yellow";
-          textColorClass = "text-yellow-400"; // Adjusted for dark theme
+          textColorClass = "text-yellow-600"; // Darker yellow for light theme
         } else {
           progressBarClass = "progress-bar-red";
-          textColorClass = "text-red-400"; // Adjusted for dark theme
+          textColorClass = "text-red-600"; // Darker red for light theme
         }
 
         return (
@@ -127,19 +127,20 @@ export const getPoColumns = (findSkuById: (skuId: string) => SKU | undefined): C
         switch (status) {
           case "Concluída":
             variant = "default";
-            className = "bg-green-600 hover:bg-green-700 text-white"; // Adjusted for dark theme
+            className = "bg-green-500 hover:bg-green-600 text-white";
             break;
           case "Em Progresso":
             variant = "outline";
-            className = "border-yellow-500 text-yellow-400 hover:bg-yellow-500/10"; // Adjusted for dark theme
+            // For light theme, yellow text needs to be darker, border can be yellow, hover can be light yellow
+            className = "border-yellow-500 text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400 dark:hover:bg-yellow-500/20";
             break;
           case "Aberta":
             variant = "secondary";
-            className = "bg-blue-600 hover:bg-blue-700 text-white"; // Adjusted for dark theme
+            className = "bg-blue-500 hover:bg-blue-600 text-white";
             break;
           case "Cancelada":
             variant = "destructive";
-            className = "bg-red-600 hover:bg-red-700 text-white"; // Adjusted for dark theme
+            className = "bg-red-500 hover:bg-red-600 text-white";
             break;
           default:
             variant = "default";
