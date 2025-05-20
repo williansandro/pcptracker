@@ -36,15 +36,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Adicionada a importação aqui
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Trash2, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SkuProductionDetailsModal } from "./sku-production-details-modal";
 
 interface DemandDataTableProps<TData extends Demand, TValue> {
   data: TData[];
   skus: SKU[];
+  productionOrders: ProductionOrder[];
   findSkuById: (skuId: string) => SKU | undefined;
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[];
 }
@@ -52,6 +54,7 @@ interface DemandDataTableProps<TData extends Demand, TValue> {
 export function DemandDataTable<TData extends Demand, TValue>({
   data,
   skus,
+  productionOrders,
   findSkuById,
   getProductionOrdersBySku,
 }: DemandDataTableProps<TData, TValue>) {
@@ -61,12 +64,21 @@ export function DemandDataTable<TData extends Demand, TValue>({
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
   const [skuFilter, setSkuFilter] = React.useState<string>("all");
 
+  const [isSkuDetailsModalOpen, setIsSkuDetailsModalOpen] = React.useState(false);
+  const [selectedSkuDataForModal, setSelectedSkuDataForModal] = React.useState<{sku: SKU, productionOrders: ProductionOrder[]} | null>(null);
+
   const { deleteSelectedDemands } = useAppContext();
   const { toast } = useToast();
 
+  const handleSkuClick = React.useCallback((sku: SKU) => {
+    const ordersForSku = productionOrders.filter(po => po.skuId === sku.id);
+    setSelectedSkuDataForModal({ sku, productionOrders: ordersForSku });
+    setIsSkuDetailsModalOpen(true);
+  }, [productionOrders]);
+
   const columns = React.useMemo(
-    () => getDemandColumns(findSkuById, getProductionOrdersBySku),
-    [findSkuById, getProductionOrdersBySku]
+    () => getDemandColumns(findSkuById, getProductionOrdersBySku, handleSkuClick),
+    [findSkuById, getProductionOrdersBySku, handleSkuClick]
   );
 
   const sortedSkus = React.useMemo(() =>
@@ -156,7 +168,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteSelected}
-                    className="bg-destructive hover:bg-destructive/90"
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                   >
                     Excluir {selectedRows.length} demanda(s)
                   </AlertDialogAction>
@@ -171,7 +183,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="border-b-border">
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id} className="py-3">
@@ -219,6 +231,16 @@ export function DemandDataTable<TData extends Demand, TValue>({
         </Table>
       </div>
       <DataTablePagination table={table} />
+      {selectedSkuDataForModal && (
+        <SkuProductionDetailsModal
+          isOpen={isSkuDetailsModalOpen}
+          onClose={() => setIsSkuDetailsModalOpen(false)}
+          sku={selectedSkuDataForModal.sku}
+          productionOrders={selectedSkuDataForModal.productionOrders}
+        />
+      )}
     </div>
   );
 }
+
+    

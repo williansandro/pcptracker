@@ -53,18 +53,14 @@ export const getDemandColumns = (
         return (
           <Button
             variant="link"
-            className="p-0 h-auto font-medium text-primary hover:underline text-left"
+            className="p-0 h-auto text-left"
             onClick={() => {
-              console.log('SKU cell clicked. SKU:', sku, 'typeof onSkuClick:', typeof onSkuClick);
               if (sku && typeof onSkuClick === 'function') {
                  onSkuClick(sku);
-              } else {
-                console.error('onSkuClick is not a function or SKU is undefined');
               }
             }}
             title={`Ver detalhes de ${sku.code}`}
           >
-            {/* Envolver conteúdo em um div para melhor controle de layout dentro do botão */}
             <div>
               <span className="text-primary font-semibold">{sku.code}</span>
               <div className="text-xs text-muted-foreground font-normal truncate max-w-[150px]">
@@ -85,7 +81,6 @@ export const getDemandColumns = (
       ),
       cell: ({ row }) => {
         const monthYearStr = row.getValue("monthYear") as string;
-        // Adicionando um valor de fallback para inputFormat se necessário, embora yyyy-MM seja padrão
         return <ClientSideDateTime dateString={monthYearStr} inputFormat="yyyy-MM" outputFormat="MMMM yyyy" locale={ptBR} placeholder="Data Inválida"/>;
       }
     },
@@ -140,7 +135,7 @@ export const getDemandColumns = (
           textColorClass = "text-green-600 dark:text-green-400";
         } else if (progressPercentage >= 70) {
           progressBarClass = "progress-bar-yellow";
-          textColorClass = "text-yellow-700 dark:text-yellow-400";
+          textColorClass = "text-yellow-700 dark:text-yellow-400"; // Ajustado para melhor legibilidade em tema claro
         } else {
           progressBarClass = "progress-bar-red";
           textColorClass = "text-red-600 dark:text-red-400";
@@ -160,3 +155,5 @@ export const getDemandColumns = (
     },
   ];
 };
+
+    
