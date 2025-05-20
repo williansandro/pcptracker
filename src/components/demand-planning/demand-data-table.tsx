@@ -41,12 +41,12 @@ import {
 import { Trash2, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SkuProductionDetailsModal } from "./sku-production-details-modal";
+import { SkuProductionDetailsModal } from "./sku-production-details-modal"; 
 
 interface DemandDataTableProps<TData extends Demand, TValue> {
   data: TData[];
   skus: SKU[];
-  productionOrders: ProductionOrder[];
+  productionOrders: ProductionOrder[]; // Adicionada a prop
   findSkuById: (skuId: string) => SKU | undefined;
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[];
 }
@@ -234,7 +234,10 @@ export function DemandDataTable<TData extends Demand, TValue>({
       {selectedSkuDataForModal && (
         <SkuProductionDetailsModal
           isOpen={isSkuDetailsModalOpen}
-          onClose={() => setIsSkuDetailsModalOpen(false)}
+          onClose={() => {
+            setIsSkuDetailsModalOpen(false);
+            setSelectedSkuDataForModal(null);
+          }}
           sku={selectedSkuDataForModal.sku}
           productionOrders={selectedSkuDataForModal.productionOrders}
         />
