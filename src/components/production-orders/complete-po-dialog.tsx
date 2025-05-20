@@ -24,21 +24,23 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox"; // Importar Checkbox
 import { useAppContext } from "@/contexts/app-context";
 import type { ProductionOrder } from "@/types";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2 } from "lucide-react";
 
 const completePoFormSchema = z.object({
   producedQuantity: z.coerce.number().min(0, "Quantidade produzida não pode ser negativa."),
+  deductLunchBreak: z.boolean().optional().default(false), // Novo campo
 });
 
 type CompletePoFormValues = z.infer<typeof completePoFormSchema>;
 
 interface CompletePoDialogProps {
   productionOrder: ProductionOrder;
-  triggerButton?: React.ReactNode; // Para o botão que abre o diálogo
+  triggerButton?: React.ReactNode;
 }
 
 export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoDialogProps) {
@@ -50,16 +52,26 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
   const form = useForm<CompletePoFormValues>({
     resolver: zodResolver(completePoFormSchema),
     defaultValues: {
-      producedQuantity: productionOrder.targetQuantity, // Sugere a quantidade alvo
+      producedQuantity: productionOrder.targetQuantity,
+      deductLunchBreak: false, // Valor padrão
     },
   });
 
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        producedQuantity: productionOrder.targetQuantity,
+        deductLunchBreak: false,
+      });
+    }
+  }, [open, form, productionOrder.targetQuantity]);
+
   const onSubmit = (data: CompletePoFormValues) => {
     try {
-      stopProductionOrderTimer(productionOrder.id, data.producedQuantity);
+      stopProductionOrderTimer(productionOrder.id, data.producedQuantity, data.deductLunchBreak);
       toast({ title: "Produção Concluída", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) finalizada com ${data.producedQuantity} unidades.` });
       setOpen(false);
-      form.reset();
+      // form.reset(); // Reset já é feito no useEffect quando o dialog abre
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível finalizar a Ordem de Produção.", variant: "destructive" });
       console.error("Erro ao finalizar OP:", error);
@@ -71,7 +83,7 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
       <DialogTrigger asChild>
         {triggerButton ? triggerButton : (
              <Button variant="ghost" size="icon" title="Finalizar Produção">
-                <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                <CheckCircle2 className="h-5 w-5 text-blue-400 hover:text-blue-500" />
             </Button>
         )}
       </DialogTrigger>
@@ -95,6 +107,25 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
                     <Input type="number" placeholder="Ex: 95" {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="deductLunchBreak"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-card-foreground/5">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="cursor-pointer">
+                      Descontar pausa para almoço (60 min)?
+                    </FormLabel>
+                  </div>
                 </FormItem>
               )}
             />
