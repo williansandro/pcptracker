@@ -25,7 +25,7 @@ interface SkuProductionDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   sku: SKU | null;
-  productionOrders: ProductionOrder[];
+  productionOrders: ProductionOrder[]; // Esta prop já deve vir filtrada para o SKU
 }
 
 const STATUS_COLORS_MODAL: Record<ProductionOrderStatus, string> = {
@@ -47,12 +47,16 @@ export function SkuProductionDetailsModal({
   isOpen,
   onClose,
   sku,
-  productionOrders,
+  productionOrders, // Esta lista já deve ser a de OPs apenas para o SKU em questão
 }: SkuProductionDetailsModalProps) {
 
   const relevantPOs = useMemo(() => {
-    if (!sku) return [];
-    return productionOrders.filter(po => po.skuId === sku.id);
+    // A prop 'productionOrders' já deve ser a lista filtrada para o SKU atual.
+    // Se o sku não estiver definido, ou a lista de productionOrders estiver vazia, retorna array vazio.
+    if (!sku) {
+      return [];
+    }
+    return productionOrders; // Usar diretamente a prop que já deve vir filtrada.
   }, [sku, productionOrders]);
 
   const summary = useMemo(() => {
@@ -71,7 +75,7 @@ export function SkuProductionDetailsModal({
   }, [sku, relevantPOs]);
 
   const statusDistributionData = useMemo(() => {
-    if (!sku) return [];
+    if (!sku || relevantPOs.length === 0) return [];
     const statusCounts = relevantPOs.reduce((acc, po) => {
       acc[po.status] = (acc[po.status] || 0) + 1;
       return acc;
@@ -85,7 +89,7 @@ export function SkuProductionDetailsModal({
   }, [sku, relevantPOs]);
 
   const metaVsRealizadoData = useMemo(() => {
-    if (!sku) return [];
+    if (!sku || relevantPOs.length === 0) return [];
     return relevantPOs
       .filter(po => po.status === 'Concluída' || po.status === 'Em Progresso')
       .sort((a, b) => (b.createdAt && a.createdAt) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0)
@@ -164,7 +168,7 @@ export function SkuProductionDetailsModal({
                               const x = cx + radius * Math.cos(-midAngle * RADIAN);
                               const y = cy + radius * Math.sin(-midAngle * RADIAN);
                               return (percent * 100) > 5 ? (
-                                <text x={x} y={y} fill="hsl(var(--card-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontWeight="bold">
+                                <text x={x} y={y} fill="hsl(var(--primary-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontWeight="bold" fontSize="10px">
                                   {`${(percent * 100).toFixed(0)}%`}
                                 </text>
                               ) : null;
@@ -238,10 +242,11 @@ export function SkuProductionDetailsModal({
                           <tr key={po.id} className="border-b border-border hover:bg-muted/30">
                             <td className="p-2">
                                <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium",
-                                po.status === 'Concluída' ? 'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100' :
-                                po.status === 'Em Progresso' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100' :
-                                po.status === 'Aberta' ? 'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100' :
-                                po.status === 'Cancelada' ? 'bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
+                                po.status === 'Concluída' ? 'bg-green-500/20 text-green-300' : // Ajustado para tema escuro
+                                po.status === 'Em Progresso' ? 'bg-yellow-500/20 text-yellow-300' : // Ajustado para tema escuro
+                                po.status === 'Aberta' ? 'bg-blue-500/20 text-blue-300' : // Ajustado para tema escuro
+                                po.status === 'Cancelada' ? 'bg-red-500/20 text-red-300' : // Ajustado para tema escuro
+                                'bg-gray-500/20 text-gray-300' // Ajustado para tema escuro
                               )}>
                                 {po.status}
                               </span>
