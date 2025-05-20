@@ -46,7 +46,7 @@ import { SkuProductionDetailsModal } from "./sku-production-details-modal";
 interface DemandDataTableProps<TData extends Demand, TValue> {
   data: TData[];
   skus: SKU[];
-  productionOrders: ProductionOrder[]; // Adicionada a prop
+  productionOrders: ProductionOrder[];
   findSkuById: (skuId: string) => SKU | undefined;
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[];
 }
@@ -54,7 +54,7 @@ interface DemandDataTableProps<TData extends Demand, TValue> {
 export function DemandDataTable<TData extends Demand, TValue>({
   data,
   skus,
-  productionOrders,
+  productionOrders: propProductionOrders, // Renamed prop
   findSkuById,
   getProductionOrdersBySku,
 }: DemandDataTableProps<TData, TValue>) {
@@ -70,11 +70,15 @@ export function DemandDataTable<TData extends Demand, TValue>({
   const { deleteSelectedDemands } = useAppContext();
   const { toast } = useToast();
 
+  // Ensure productionOrders is always an array for local use
+  const productionOrders = propProductionOrders || [];
+
   const handleSkuClick = React.useCallback((sku: SKU) => {
+    // 'productionOrders' here now refers to the local const which is guaranteed to be an array.
     const ordersForSku = productionOrders.filter(po => po.skuId === sku.id);
     setSelectedSkuDataForModal({ sku, productionOrders: ordersForSku });
     setIsSkuDetailsModalOpen(true);
-  }, [productionOrders]);
+  }, [productionOrders]); // Depends on the local, guaranteed-to-be-array 'productionOrders'
 
   const columns = React.useMemo(
     () => getDemandColumns(findSkuById, getProductionOrdersBySku, handleSkuClick),
@@ -245,5 +249,4 @@ export function DemandDataTable<TData extends Demand, TValue>({
     </div>
   );
 }
-
     
