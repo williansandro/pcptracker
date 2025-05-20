@@ -14,7 +14,8 @@ import { cn } from "@/lib/utils";
 
 export const getDemandColumns = (
   findSkuById: (skuId: string) => SKU | undefined,
-  getProductionOrdersBySku: (skuId: string) => ProductionOrder[]
+  getProductionOrdersBySku: (skuId: string) => ProductionOrder[],
+  onSkuClick: (sku: SKU) => void
 ): ColumnDef<Demand>[] => {
 
   return [
@@ -44,15 +45,34 @@ export const getDemandColumns = (
       accessorKey: "skuId",
       header: "SKU",
       cell: ({ row }) => {
-        const sku = findSkuById(row.getValue("skuId"));
-        return sku ? (
-          <div>
-            <span className="text-primary font-medium">{sku.code}</span>
-            <span className="text-xs text-muted-foreground ml-1">
-              ({sku.description.substring(0,20)}{sku.description.length > 20 ? '...' : ''})
-            </span>
-          </div>
-        ) : "SKU não encontrado";
+        const skuIdValue = row.getValue("skuId") as string;
+        const sku = findSkuById(skuIdValue);
+        if (!sku) {
+          return <div className="text-muted-foreground">SKU ID: {skuIdValue?.substring(0,6)}... N/E</div>;
+        }
+        return (
+          <Button
+            variant="link"
+            className="p-0 h-auto font-medium text-primary hover:underline text-left"
+            onClick={() => {
+              console.log('SKU cell clicked. SKU:', sku, 'typeof onSkuClick:', typeof onSkuClick);
+              if (sku && typeof onSkuClick === 'function') {
+                 onSkuClick(sku);
+              } else {
+                console.error('onSkuClick is not a function or SKU is undefined');
+              }
+            }}
+            title={`Ver detalhes de ${sku.code}`}
+          >
+            {/* Envolver conteúdo em um div para melhor controle de layout dentro do botão */}
+            <div>
+              <span className="text-primary font-semibold">{sku.code}</span>
+              <div className="text-xs text-muted-foreground font-normal truncate max-w-[150px]">
+                ({sku.description})
+              </div>
+            </div>
+          </Button>
+        );
       },
     },
     {
@@ -65,7 +85,8 @@ export const getDemandColumns = (
       ),
       cell: ({ row }) => {
         const monthYearStr = row.getValue("monthYear") as string;
-        return <ClientSideDateTime dateString={monthYearStr} inputFormat="yyyy-MM" outputFormat="MMMM yyyy" locale={ptBR} />;
+        // Adicionando um valor de fallback para inputFormat se necessário, embora yyyy-MM seja padrão
+        return <ClientSideDateTime dateString={monthYearStr} inputFormat="yyyy-MM" outputFormat="MMMM yyyy" locale={ptBR} placeholder="Data Inválida"/>;
       }
     },
     {
@@ -113,16 +134,16 @@ export const getDemandColumns = (
 
         if (progressPercentage > 100) {
           progressBarClass = "progress-bar-blue";
-          textColorClass = "text-blue-600"; 
+          textColorClass = "text-blue-600 dark:text-blue-400";
         } else if (progressPercentage >= 90) {
           progressBarClass = "progress-bar-green";
-          textColorClass = "text-green-600";
+          textColorClass = "text-green-600 dark:text-green-400";
         } else if (progressPercentage >= 70) {
           progressBarClass = "progress-bar-yellow";
-          textColorClass = "text-yellow-600";
+          textColorClass = "text-yellow-700 dark:text-yellow-400";
         } else {
           progressBarClass = "progress-bar-red";
-          textColorClass = "text-red-600";
+          textColorClass = "text-red-600 dark:text-red-400";
         }
         
         return (
