@@ -25,7 +25,7 @@ interface SkuProductionDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   sku: SKU | null;
-  productionOrders: ProductionOrder[]; // Esta prop DEVE vir filtrada para o SKU
+  productionOrders: ProductionOrder[];
 }
 
 const STATUS_COLORS_MODAL: Record<ProductionOrderStatus, string> = {
@@ -47,23 +47,18 @@ export function SkuProductionDetailsModal({
   isOpen,
   onClose,
   sku,
-  productionOrders, // Espera-se que esta lista já esteja filtrada para o SKU em questão
+  productionOrders,
 }: SkuProductionDetailsModalProps) {
 
   useEffect(() => {
     if (isOpen && sku) {
       console.log("[SkuProductionDetailsModal] Opened for SKU:", sku.code, "(ID:", sku.id, ")");
-      console.log("[SkuProductionDetailsModal] Received productionOrders prop:", productionOrders);
+      console.log("[SkuProductionDetailsModal] Received productionOrders prop (length):", productionOrders.length, productionOrders);
     }
   }, [isOpen, sku, productionOrders]);
 
   const relevantPOs = useMemo(() => {
-    // A prop productionOrders já deve vir filtrada pelo SKU
-    // Não é necessário filtrar novamente por sku.id aqui, a menos que a prop não seja confiável.
-    // Se productionOrders não vier filtrada, então um filtro aqui seria:
-    // if (!sku) return [];
-    // return (productionOrders || []).filter(po => po.skuId === sku.id);
-    return productionOrders || []; // Assumindo que a prop productionOrders já está corretamente filtrada.
+    return productionOrders || [];
   }, [productionOrders]);
 
 
@@ -293,5 +288,3 @@ export function SkuProductionDetailsModal({
   );
 }
 
-
-    

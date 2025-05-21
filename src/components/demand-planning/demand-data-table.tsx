@@ -41,7 +41,7 @@ import {
 import { Trash2, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SkuProductionDetailsModal } from "./sku-production-details-modal"; 
+import { SkuProductionDetailsModal } from "./sku-production-details-modal";
 
 interface DemandDataTableProps<TData extends Demand, TValue> {
   data: TData[];
@@ -54,7 +54,7 @@ interface DemandDataTableProps<TData extends Demand, TValue> {
 export function DemandDataTable<TData extends Demand, TValue>({
   data,
   skus,
-  productionOrders: propProductionOrders, // Renamed prop
+  productionOrders: propProductionOrders,
   findSkuById,
   getProductionOrdersBySku,
 }: DemandDataTableProps<TData, TValue>) {
@@ -70,15 +70,23 @@ export function DemandDataTable<TData extends Demand, TValue>({
   const { deleteSelectedDemands } = useAppContext();
   const { toast } = useToast();
 
-  // Ensure productionOrders is always an array for local use
-  const productionOrders = propProductionOrders || [];
+  // Garantir que localProductionOrders seja sempre um array
+  const localProductionOrders = propProductionOrders || [];
 
   const handleSkuClick = React.useCallback((sku: SKU) => {
-    // 'productionOrders' here now refers to the local const which is guaranteed to be an array.
-    const ordersForSku = productionOrders.filter(po => po.skuId === sku.id);
+    console.log("[DemandDataTable] handleSkuClick for SKU ID:", sku.id, "SKU Code:", sku.code);
+    console.log("[DemandDataTable] Filtering from localProductionOrders (length):", localProductionOrders.length, localProductionOrders);
+
+    const ordersForSku = localProductionOrders.filter(po => {
+      // console.log(`[DemandDataTable] Comparing PO SKU ID: '${po.skuId}' with clicked SKU ID: '${sku.id}' -> Match: ${po.skuId === sku.id}`);
+      return po.skuId === sku.id;
+    });
+
+    console.log("[DemandDataTable] Filtered ordersForSku (length):", ordersForSku.length, ordersForSku);
+
     setSelectedSkuDataForModal({ sku, productionOrders: ordersForSku });
     setIsSkuDetailsModalOpen(true);
-  }, [productionOrders]); // Depends on the local, guaranteed-to-be-array 'productionOrders'
+  }, [localProductionOrders]);
 
   const columns = React.useMemo(
     () => getDemandColumns(findSkuById, getProductionOrdersBySku, handleSkuClick),
