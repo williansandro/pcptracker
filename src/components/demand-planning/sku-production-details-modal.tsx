@@ -52,8 +52,8 @@ export function SkuProductionDetailsModal({
 
   useEffect(() => {
     if (isOpen && sku) {
-      console.log("[SkuProductionDetailsModal] Opened for SKU:", sku.code, "(ID:", sku.id, ")");
-      console.log("[SkuProductionDetailsModal] Received productionOrders prop (length):", productionOrders.length, productionOrders);
+      console.log(`[SkuProductionDetailsModal] Opened for SKU: ${sku.code} (ID: ${sku.id})`);
+      console.log("[SkuProductionDetailsModal] Received productionOrders prop:", productionOrders);
     }
   }, [isOpen, sku, productionOrders]);
 
@@ -67,13 +67,13 @@ export function SkuProductionDetailsModal({
     const completedPOs = relevantPOs.filter(po => po.status === 'Concluída');
     const totalProduced = completedPOs.reduce((sum, po) => sum + (po.producedQuantity || 0), 0);
     const totalProductionTimeSeconds = completedPOs.reduce((sum, po) => sum + (po.productionTime || 0), 0);
-    const avgProductionTimeSeconds = completedPOs.length > 0 ? totalProductionTimeSeconds / completedPOs.length : 0;
+    // const avgProductionTimeSeconds = completedPOs.length > 0 ? totalProductionTimeSeconds / completedPOs.length : 0;
 
     return {
       totalPOs: relevantPOs.length,
       completedPOsCount: completedPOs.length,
       totalProduced,
-      avgProductionTimeFormatted: formatDuration(avgProductionTimeSeconds),
+      totalProductionTimeFormatted: formatDuration(totalProductionTimeSeconds), // Alterado de avgProductionTimeFormatted
     };
   }, [sku, relevantPOs]);
 
@@ -136,8 +136,8 @@ export function SkuProductionDetailsModal({
                     <p className="font-semibold text-lg">{summary.totalProduced.toLocaleString('pt-BR')} un</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Tempo Médio Prod.</p>
-                    <p className="font-semibold text-lg">{summary.avgProductionTimeFormatted}</p>
+                    <p className="text-muted-foreground">Tempo Total Prod.</p> 
+                    <p className="font-semibold text-lg">{summary.totalProductionTimeFormatted}</p>
                   </div>
                   {relevantPOs.length === 0 && (
                     <p className="text-sm text-muted-foreground col-span-full text-center py-2">
@@ -161,7 +161,7 @@ export function SkuProductionDetailsModal({
                           <RechartsTooltip
                             cursor={{ fill: "hsl(var(--muted))" }}
                             content={<ChartTooltipContent hideLabel />}
-                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--card-foreground))' }}
                             itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                           />
                           <Pie
