@@ -6,7 +6,7 @@ import { DemandDataTable } from "@/components/demand-planning/demand-data-table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function DemandPlanningPage() {
-  const { demands, skus, findSkuById, getProductionOrdersBySku } = useAppContext();
+  const { demands, skus, productionOrders, findSkuById, getProductionOrdersBySku } = useAppContext();
 
   return (
     <div className="container mx-auto py-10">
@@ -21,6 +21,7 @@ export default function DemandPlanningPage() {
           <DemandDataTable
             data={demands}
             skus={skus}
+            productionOrders={productionOrders} // Prop adicionada aqui
             findSkuById={findSkuById}
             getProductionOrdersBySku={getProductionOrdersBySku}
           />
