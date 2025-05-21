@@ -46,7 +46,7 @@ import { SkuProductionDetailsModal } from "./sku-production-details-modal";
 interface DemandDataTableProps<TData extends Demand, TValue> {
   data: TData[];
   skus: SKU[];
-  productionOrders: ProductionOrder[];
+  productionOrders: ProductionOrder[]; // Renomeado para evitar conflito com o estado local
   findSkuById: (skuId: string) => SKU | undefined;
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[];
 }
@@ -54,7 +54,7 @@ interface DemandDataTableProps<TData extends Demand, TValue> {
 export function DemandDataTable<TData extends Demand, TValue>({
   data,
   skus,
-  productionOrders: propProductionOrders,
+  productionOrders: propProductionOrders, // Usar prop com nome diferente
   findSkuById,
   getProductionOrdersBySku,
 }: DemandDataTableProps<TData, TValue>) {
@@ -70,27 +70,33 @@ export function DemandDataTable<TData extends Demand, TValue>({
   const { deleteSelectedDemands } = useAppContext();
   const { toast } = useToast();
 
-  // Garantir que localProductionOrders seja sempre um array
   const localProductionOrders = propProductionOrders || [];
 
   const handleSkuClick = React.useCallback((sku: SKU) => {
     console.log("[DemandDataTable] handleSkuClick for SKU ID:", sku.id, "SKU Code:", sku.code);
-    console.log("[DemandDataTable] Filtering from localProductionOrders (length):", localProductionOrders.length, localProductionOrders);
+    console.log("[DemandDataTable] Filtering from localProductionOrders (length):", localProductionOrders.length);
 
-    const ordersForSku = localProductionOrders.filter(po => {
-      // console.log(`[DemandDataTable] Comparing PO SKU ID: '${po.skuId}' with clicked SKU ID: '${sku.id}' -> Match: ${po.skuId === sku.id}`);
-      return po.skuId === sku.id;
-    });
+    const specificPoIdToCheck = "ad479d66-a681-4d33-a2f2-2d2e861f9525"; // ID da OP da sua imagem
+    const opFromImageInLocalList = localProductionOrders.find(po => po.id === specificPoIdToCheck);
 
-    console.log("[DemandDataTable] Filtered ordersForSku (length):", ordersForSku.length, ordersForSku);
+    if (opFromImageInLocalList) {
+      console.log(`[DemandDataTable] OP from image (${specificPoIdToCheck}) FOUND in localProductionOrders. Its skuId:`, opFromImageInLocalList.skuId);
+      console.log(`[DemandDataTable] Comparing OP's skuId ('${opFromImageInLocalList.skuId}') with clicked SKU's id ('${sku.id}'). Match: ${opFromImageInLocalList.skuId === sku.id}`);
+    } else {
+      console.log(`[DemandDataTable] OP from image (${specificPoIdToCheck}) NOT FOUND in localProductionOrders.`);
+    }
+
+    const ordersForSku = localProductionOrders.filter(po => po.skuId === sku.id);
+    console.log("[DemandDataTable] Filtered ordersForSku (length):", ordersForSku.length, ordersForSku.map(o => o.id));
+
 
     setSelectedSkuDataForModal({ sku, productionOrders: ordersForSku });
     setIsSkuDetailsModalOpen(true);
-  }, [localProductionOrders]);
+  }, [localProductionOrders]); // Dependência corrigida para localProductionOrders
 
   const columns = React.useMemo(
     () => getDemandColumns(findSkuById, getProductionOrdersBySku, handleSkuClick),
-    [findSkuById, getProductionOrdersBySku, handleSkuClick]
+    [findSkuById, getProductionOrdersBySku, handleSkuClick] // handleSkuClick adicionado
   );
 
   const sortedSkus = React.useMemo(() =>
