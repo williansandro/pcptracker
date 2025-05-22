@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox"; // Importar Checkbox
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/app-context";
 import type { ProductionOrder, ProductionOrderStatus } from "@/types";
@@ -31,8 +32,8 @@ import { PRODUCTION_ORDER_STATUSES } from "@/lib/constants";
 import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea
+import { format, parseISO, isValid } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const poFormSchema = z.object({
   skuId: z.string().min(1, "SKU é obrigatório."),
@@ -42,18 +43,19 @@ const poFormSchema = z.object({
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   producedQuantity: z.coerce.number().optional(),
+  deductLunchBreak: z.boolean().optional().default(false), // Novo campo
 })
 .superRefine((data, ctx) => {
-  const currentStatus = data.status; 
+  const currentStatus = data.status;
 
   if (currentStatus === 'Concluída') {
-    if (!data.startTime) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de início é obrigatória.", path: ['startTime'] });
+    if (!data.startTime || !isValid(parseISO(data.startTime))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de início é obrigatória e válida.", path: ['startTime'] });
     }
-    if (!data.endTime) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de término é obrigatória.", path: ['endTime'] });
+    if (!data.endTime || !isValid(parseISO(data.endTime))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de término é obrigatória e válida.", path: ['endTime'] });
     }
-    if (data.startTime && data.endTime && new Date(data.endTime) < new Date(data.startTime)) {
+    if (data.startTime && data.endTime && isValid(parseISO(data.startTime)) && isValid(parseISO(data.endTime)) && new Date(data.endTime) < new Date(data.startTime)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de término deve ser igual ou após a data de início.", path: ['endTime'] });
     }
     if (typeof data.producedQuantity !== 'number' || data.producedQuantity < 0) {
@@ -61,8 +63,8 @@ const poFormSchema = z.object({
     }
   }
   if (currentStatus === 'Em Progresso') {
-    if (!data.startTime) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de início é obrigatória.", path: ['startTime'] });
+    if (!data.startTime || !isValid(parseISO(data.startTime))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de início é obrigatória e válida.", path: ['startTime'] });
     }
   }
 });
@@ -74,14 +76,17 @@ interface PoFormDialogProps {
   trigger?: React.ReactNode;
 }
 
-// Helper para formatar ISO string para datetime-local input
 const formatIsoToDateTimeLocal = (isoString: string | undefined | null): string => {
   if (!isoString) return "";
   try {
-    return format(parseISO(isoString), "yyyy-MM-dd'T'HH:mm");
+    const date = parseISO(isoString);
+    if (isValid(date)) {
+      return format(date, "yyyy-MM-dd'T'HH:mm");
+    }
+    return "";
   } catch (error) {
     console.warn("Erro ao formatar data para datetime-local:", isoString, error);
-    return ""; 
+    return "";
   }
 };
 
@@ -96,11 +101,12 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     ? {
         skuId: productionOrder.skuId,
         targetQuantity: productionOrder.targetQuantity,
-        producedQuantity: productionOrder.producedQuantity ?? undefined, // Garante que é undefined se null
+        producedQuantity: productionOrder.producedQuantity ?? undefined,
         notes: productionOrder.notes || "",
         status: productionOrder.status,
         startTime: formatIsoToDateTimeLocal(productionOrder.startTime),
         endTime: formatIsoToDateTimeLocal(productionOrder.endTime),
+        deductLunchBreak: false, // Inicializa como falso, usuário pode marcar se quiser recalcular
       }
     : {
         skuId: "",
@@ -110,6 +116,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
         startTime: "",
         endTime: "",
         producedQuantity: undefined,
+        deductLunchBreak: false,
       };
   }, [productionOrder]);
 
@@ -128,43 +135,46 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
   const onSubmit = (data: PoFormValues) => {
     try {
       const sku = findSkuById(data.skuId);
-      if (productionOrder) { 
+      if (productionOrder) {
         const updatePayload: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>> = {
           skuId: data.skuId,
           targetQuantity: data.targetQuantity,
           notes: data.notes,
-          // status: productionOrder.status, // Manter o status original, não alterável diretamente aqui
+          status: data.status, // Manter o status atual, a menos que seja explicitamente alterado
         };
 
-        if (productionOrder.status === 'Em Progresso') {
-          updatePayload.startTime = data.startTime ? new Date(data.startTime).toISOString() : null;
-          updatePayload.endTime = null; 
+        if (data.status === 'Em Progresso') {
+          updatePayload.startTime = data.startTime && isValid(parseISO(data.startTime)) ? new Date(data.startTime).toISOString() : null;
+          updatePayload.endTime = null;
           updatePayload.productionTime = null;
           updatePayload.producedQuantity = undefined;
-        } else if (productionOrder.status === 'Concluída') {
-          updatePayload.startTime = data.startTime ? new Date(data.startTime).toISOString() : null;
-          updatePayload.endTime = data.endTime ? new Date(data.endTime).toISOString() : null;
+        } else if (data.status === 'Concluída') {
+          updatePayload.startTime = data.startTime && isValid(parseISO(data.startTime)) ? new Date(data.startTime).toISOString() : null;
+          updatePayload.endTime = data.endTime && isValid(parseISO(data.endTime)) ? new Date(data.endTime).toISOString() : null;
           updatePayload.producedQuantity = data.producedQuantity;
 
           if (updatePayload.startTime && updatePayload.endTime) {
             const startTimeMs = new Date(updatePayload.startTime).getTime();
             const endTimeMs = new Date(updatePayload.endTime).getTime();
             if (endTimeMs >= startTimeMs) {
-              updatePayload.productionTime = Math.floor((endTimeMs - startTimeMs) / 1000);
+              let calculatedProductionTime = Math.floor((endTimeMs - startTimeMs) / 1000);
+              if (data.deductLunchBreak) { // Aplica dedução se checkbox estiver marcado
+                calculatedProductionTime -= 3600;
+              }
+              updatePayload.productionTime = calculatedProductionTime;
             } else {
-              toast({ title: "Erro de Validação", description: "Data de término não pode ser anterior à data de início.", variant: "destructive" });
-              return;
+              updatePayload.productionTime = null; // Erro de data, tempo inválido
             }
           } else {
              updatePayload.productionTime = null;
           }
         }
-        
+
 
         updateProductionOrder(productionOrder.id, updatePayload);
         toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) atualizada.` });
 
-      } else { 
+      } else {
         addProductionOrder({ skuId: data.skuId, targetQuantity: data.targetQuantity, notes: data.notes });
         toast({ title: "Ordem de Produção Adicionada", description: `Nova OP para ${sku?.code || ''} adicionada.` });
       }
@@ -174,11 +184,11 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
       console.error("Erro ao salvar OP:", error);
     }
   };
-  
+
   const currentPoStatusForEdit = productionOrder?.status;
 
-  const sortedSkus = React.useMemo(() => 
-    [...skus].sort((a, b) => a.code.localeCompare(b.code)), 
+  const sortedSkus = React.useMemo(() =>
+    [...skus].sort((a, b) => a.code.localeCompare(b.code)),
   [skus]);
 
 
@@ -198,7 +208,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             {productionOrder ? "Atualize os detalhes da OP." : "Preencha os detalhes para uma nova OP."}
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[65vh] pr-6"> {/* Apply ScrollArea and max-height */}
+        <ScrollArea className="max-h-[65vh] pr-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
               <FormField
@@ -207,10 +217,10 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>SKU</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value} 
-                      value={field.value} 
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      value={field.value}
                       disabled={!!productionOrder && currentPoStatusForEdit !== 'Aberta'}
                     >
                       <FormControl>
@@ -220,7 +230,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                       </FormControl>
                       <SelectContent>
                         {sortedSkus.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
+                          <SelectItem key={s.id} value={s.id}>{s.code}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -235,10 +245,10 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                   <FormItem>
                     <FormLabel>Quantidade Alvo</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="100" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        placeholder="100"
+                        {...field}
                         disabled={!!productionOrder && currentPoStatusForEdit !== 'Aberta'}
                       />
                     </FormControl>
@@ -246,16 +256,17 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                   </FormItem>
                 )}
               />
-              
+
               {productionOrder && (
                 <FormField
                   control={form.control}
-                  name="status" 
+                  name="status"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
                       <FormControl>
-                         <Input {...field} readOnly disabled className="bg-muted/50" />
+                         {/* O status não é diretamente editável aqui; é alterado por ações específicas */}
+                         <Input {...field} readOnly disabled className="bg-muted/50 cursor-not-allowed" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -263,7 +274,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                 />
               )}
 
-              
+
               {productionOrder && (currentPoStatusForEdit === 'Em Progresso' || currentPoStatusForEdit === 'Concluída') && (
                 <FormField
                   control={form.control}
@@ -281,42 +292,59 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
               )}
 
               {productionOrder && currentPoStatusForEdit === 'Concluída' && (
-                <FormField
-                  control={form.control}
-                  name="endTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data de Término</FormLabel>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-              
-              
-              {productionOrder && currentPoStatusForEdit === 'Concluída' && (
-                 <FormField
-                  control={form.control}
-                  name="producedQuantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantidade Produzida</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="Ex: 95" 
-                          {...field} 
-                          value={field.value ?? ''}
-                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={form.control}
+                    name="endTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data de Término</FormLabel>
+                        <FormControl>
+                          <Input type="datetime-local" {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="producedQuantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantidade Produzida</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Ex: 95"
+                            {...field}
+                            value={field.value ?? ''} // Garante que o valor seja sempre string ou number
+                            onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="deductLunchBreak"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-card-foreground/5">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="cursor-pointer">
+                            Descontar pausa para almoço (60 min)?
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               <FormField
@@ -332,15 +360,14 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                   </FormItem>
                 )}
               />
-              {/* DialogFooter é movido para fora da ScrollArea */}
             </form>
           </Form>
         </ScrollArea>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button 
-            type="button" /* Alterado para button, o submit é do form */
-            onClick={form.handleSubmit(onSubmit)} 
+          <Button
+            type="button"
+            onClick={form.handleSubmit(onSubmit)}
             disabled={currentPoStatusForEdit === 'Cancelada'}
           >
             Salvar Ordem
@@ -350,3 +377,5 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     </Dialog>
   );
 }
+
+    
