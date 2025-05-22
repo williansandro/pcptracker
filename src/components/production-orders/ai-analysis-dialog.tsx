@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -33,10 +34,10 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
     setAnalysisResult(null);
 
     const productionData: ProductionDataEntry[] = productionOrdersForSku
-      .filter(po => po.status === 'Concluída' && po.productionTime && po.productionTime > 0)
+      .filter(po => po.status === 'Concluída' && po.productionTime && po.productionTime > 0 && typeof po.producedQuantity === 'number')
       .map(po => ({
         skuCode: sku.code,
-        quantityProduced: po.quantity,
+        quantityProduced: po.producedQuantity!, // Corrigido: Usar po.producedQuantity
         productionTimeMinutes: Math.round(po.productionTime! / 60), // productionTime é em segundos
       }));
 
@@ -76,11 +77,11 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {/* O evento onClick foi movido para handleOpenChange para melhor controle */}
-        <Button variant="outline" size="sm"> 
+        <Button variant="outline" size="sm" className="w-full justify-start text-left px-2 py-1.5 h-auto text-foreground hover:bg-accent/10"> 
           <Brain className="mr-2 h-4 w-4" /> Analisar com IA
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-card text-card-foreground">
         <DialogHeader>
           <DialogTitle>Análise de IA para SKU: {sku.code}</DialogTitle>
           <DialogDescription>
@@ -111,7 +112,7 @@ export function AiAnalysisDialog({ productionOrdersForSku, sku }: AiAnalysisDial
           )}
         </div>
         <DialogFooter>
-          <Button type="button" onClick={() => setOpen(false)}>Fechar</Button>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
