@@ -8,16 +8,23 @@ export interface SKU {
 
 export type ProductionOrderStatus = 'Aberta' | 'Em Progresso' | 'Concluída' | 'Cancelada';
 
+export interface BreakEntry {
+  id: string; // uuid
+  description: string;
+  durationMinutes: number;
+}
+
 export interface ProductionOrder {
   id: string;
   skuId: string;
-  targetQuantity: number; 
-  producedQuantity?: number; 
+  targetQuantity: number;
+  producedQuantity?: number;
   status: ProductionOrderStatus;
   startTime?: string | null; // ISO Date String
   endTime?: string | null; // ISO Date String
-  productionTime?: number | null; // em segundos
+  productionTime?: number | null; // em segundos, líquido (já descontadas as pausas)
   notes?: string;
+  breaks?: BreakEntry[]; // Lista de pausas
   createdAt: string; // ISO Date String
 }
 
@@ -32,7 +39,7 @@ export interface Demand {
 // Para Análise de IA de Produção
 export interface ProductionDataEntry {
   skuCode: string;
-  quantityProduced: number; 
+  quantityProduced: number;
   productionTimeMinutes: number;
 }
 
@@ -59,4 +66,3 @@ export type AnalyzeDemandForecastInput = {
     producedQuantity: number;
   }[];
 };
-

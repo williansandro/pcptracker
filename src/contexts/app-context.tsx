@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import type { SKU, ProductionOrder, Demand, ProductionOrderStatus } from '@/types';
+import type { SKU, ProductionOrder, Demand, ProductionOrderStatus, BreakEntry } from '@/types';
 import {
   DUMMY_SKUS_DATA,
   DUMMY_PRODUCTION_ORDERS_DATA,
@@ -45,12 +45,12 @@ interface AppContextType {
   findSkuById: (skuId: string) => SKU | undefined;
 
   productionOrders: ProductionOrder[];
-  addProductionOrder: (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity' | 'startTime' | 'endTime' | 'productionTime'>) => Promise<void>;
+  addProductionOrder: (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity' | 'startTime' | 'endTime' | 'productionTime' | 'breaks'>) => Promise<void>;
   updateProductionOrder: (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => Promise<void>;
   deleteProductionOrder: (poId: string) => Promise<void>;
   deleteSelectedProductionOrders: (poIds: string[]) => Promise<void>;
   startProductionOrderTimer: (poId: string) => Promise<void>;
-  stopProductionOrderTimer: (poId: string, producedQuantity: number, deductLunchBreak?: boolean) => Promise<void>;
+  stopProductionOrderTimer: (poId: string, producedQuantity: number, breaks?: BreakEntry[]) => Promise<void>;
   findProductionOrderById: (poId: string) => ProductionOrder | undefined;
   getProductionOrdersBySku: (skuId: string) => ProductionOrder[];
 
@@ -83,6 +83,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const mapDocToProductionOrder = useCallback((docData: any): ProductionOrder => ({
     ...docData,
+    breaks: docData.breaks || [], // Garante que breaks seja sempre um array
   } as ProductionOrder), []);
 
   const mapDocToDemand = useCallback((docData: any): Demand => ({
@@ -139,6 +140,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           startTime: status === 'Em Progresso' || status === 'Concluída' ? poData.startTime : null,
           endTime: status === 'Concluída' ? poData.endTime : null,
           productionTime: status === 'Concluída' ? poData.productionTime : null,
+          breaks: poData.breaks || [],
           createdAt: new Date(Date.now() - (DUMMY_PRODUCTION_ORDERS_DATA.length - index) * 10 * 60 * 1000).toISOString(),
         };
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, newPo.id);
@@ -223,8 +225,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         description: `Não foi possível carregar os dados do banco. ${error.message}`,
         variant: "destructive",
       });
-      // Não limpar os dados aqui, pois pode haver dados já carregados de uma sessão anterior
-      // e a falha pode ser temporária. A UI deve mostrar que está tentando carregar ou mostrar os dados antigos.
     }
   }, [currentUser, seedDatabase, toast, mapDocToSku, mapDocToProductionOrder, mapDocToDemand]);
 
@@ -362,7 +362,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           variant: "destructive",
         });
       }
-      throw error;
+      throw error; // Re-lançar para que o componente de ação possa tratar se necessário
     }
   }, [skus, toast]);
 
@@ -425,12 +425,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const findSkuById = useCallback((skuId: string) => skus.find(s => s.id === skuId), [skus]);
 
-  const addProductionOrder = useCallback(async (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity' | 'startTime' | 'endTime' | 'productionTime'>) => {
+  const addProductionOrder = useCallback(async (poData: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'producedQuantity' | 'startTime' | 'endTime' | 'productionTime' | 'breaks'>) => {
     const newPoId = uuidv4();
     const newPo: ProductionOrder = {
       ...poData,
       id: newPoId,
       status: 'Aberta',
+      breaks: [], // Inicializa com array vazio de pausas
       createdAt: new Date().toISOString()
     };
     try {
@@ -450,23 +451,48 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateProductionOrder = useCallback(async (poId: string, poData: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>>) => {
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
-      const updateData = Object.entries(poData).reduce((acc, [key, value]) => {
-        if (value !== undefined) {
-          (acc as any)[key as keyof typeof poData] = value;
+      let updateData = { ...poData };
+
+      // Recalcular productionTime se necessário
+      if (poData.status === 'Concluída' && poData.startTime && poData.endTime) {
+        const startTimeMs = new Date(poData.startTime).getTime();
+        const endTimeMs = new Date(poData.endTime).getTime();
+        if (endTimeMs >= startTimeMs) {
+          let calculatedProductionTimeSeconds = Math.floor((endTimeMs - startTimeMs) / 1000);
+          
+          const totalBreaksDurationSeconds = (poData.breaks || []).reduce((acc, itemBreak) => acc + (itemBreak.durationMinutes * 60), 0);
+          calculatedProductionTimeSeconds -= totalBreaksDurationSeconds;
+          
+          updateData.productionTime = calculatedProductionTimeSeconds;
         } else {
-          (acc as any)[key as keyof typeof poData] = null; 
+          updateData.productionTime = null; // ou lançar erro se datas forem inválidas
+        }
+      } else if (poData.status === 'Em Progresso') {
+        updateData.endTime = null;
+        updateData.productionTime = null;
+      }
+
+
+      const finalUpdateData = Object.entries(updateData).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          (acc as any)[key as keyof typeof updateData] = value;
+        } else {
+          // Se o valor for undefined, significa que não queremos atualizar esse campo
+          // ou, se quisermos explicitamente limpar, deveríamos passar null
         }
         return acc;
       }, {} as Partial<ProductionOrder>);
 
 
-      if (Object.keys(updateData).length > 0) {
-        await updateDoc(poRef, updateData);
+      if (Object.keys(finalUpdateData).length > 0) {
+        await updateDoc(poRef, finalUpdateData);
       }
+
       setProductionOrders(prev =>
-        prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po)
+        prev.map(po => po.id === poId ? { ...po, ...finalUpdateData } as ProductionOrder : po)
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       );
+       toast({ title: "Ordem de Produção Atualizada", description: `OP ${poId.substring(0,8)} atualizada.`});
     } catch (error: any) {
       console.error("Erro ao atualizar Ordem de Produção:", poId, error);
       toast({
@@ -519,7 +545,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       status: 'Em Progresso' as ProductionOrderStatus,
       startTime: new Date().toISOString(),
       endTime: null,
-      productionTime: null
+      productionTime: null,
+      breaks: poToUpdate.breaks || [], // Manter pausas existentes ou inicializar
     };
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
@@ -538,21 +565,21 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [productionOrders, toast]);
 
-  const stopProductionOrderTimer = useCallback(async (poId: string, producedQuantity: number, deductLunchBreak?: boolean) => {
+  const stopProductionOrderTimer = useCallback(async (poId: string, producedQuantity: number, breaks?: BreakEntry[]) => {
     const poToUpdate = productionOrders.find(po => po.id === poId);
     if (poToUpdate && poToUpdate.status === 'Em Progresso' && poToUpdate.startTime) {
       const endTime = new Date();
       let productionTimeSeconds = Math.floor((endTime.getTime() - new Date(poToUpdate.startTime).getTime()) / 1000);
       
-      if (deductLunchBreak) {
-        productionTimeSeconds -= 3600; 
-      }
+      const totalBreaksDurationSeconds = (breaks || []).reduce((acc, itemBreak) => acc + (itemBreak.durationMinutes * 60), 0);
+      productionTimeSeconds -= totalBreaksDurationSeconds;
       
-      const updateData = { 
-        status: 'Concluída' as ProductionOrderStatus, 
-        endTime: endTime.toISOString(), 
-        productionTime: productionTimeSeconds, 
-        producedQuantity 
+      const updateData = {
+        status: 'Concluída' as ProductionOrderStatus,
+        endTime: endTime.toISOString(),
+        productionTime: productionTimeSeconds,
+        producedQuantity,
+        breaks: breaks || [],
       };
       try {
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
@@ -610,11 +637,10 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const demandToUpdate = demands.find(d => d.id === demandId);
     if (!demandToUpdate) return;
 
-    // Verifica duplicidade se skuId ou monthYear estão sendo alterados
     const newSkuId = demandData.skuId || demandToUpdate.skuId;
     const newMonthYear = demandData.monthYear || demandToUpdate.monthYear;
     
-    if (demandData.skuId || demandData.monthYear) { // Apenas checa se os campos que definem a unicidade foram alterados
+    if (demandData.skuId || demandData.monthYear) { 
         const existingDemand = demands.find(d => d.id !== demandId && d.skuId === newSkuId && d.monthYear === newMonthYear);
         if (existingDemand) {
             toast({
@@ -666,7 +692,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [demands, toast]);
 
   const deleteSelectedDemands = useCallback(async (demandIds: string[]) => {
     const batch = writeBatch(db);
@@ -683,7 +709,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [demands, toast]);
 
   const findDemandBySkuAndMonth = useCallback((skuId: string, monthYear: string) => {
     return demands.find(d => d.skuId === skuId && d.monthYear === monthYear);
@@ -731,4 +757,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

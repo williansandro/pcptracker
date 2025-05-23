@@ -32,31 +32,36 @@ export const DUMMY_SKUS_DATA: Omit<SKU, 'id' | 'createdAt'>[] = [
 export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'skuId'>[] = [
   {
     targetQuantity: 100,
-    producedQuantity: 95, 
+    producedQuantity: 95,
     startTime: twoHoursAgo,
     endTime: oneHourAgo,
-    productionTime: 3600,
-    notes: "Primeiro lote de canetas azuis."
+    productionTime: 3540, // 3600 - 60 (pausa de 1 min para exemplo)
+    notes: "Primeiro lote de canetas azuis.",
+    breaks: [{ id: 'break1', description: "Pausa café", durationMinutes: 1 }]
   },
   {
     targetQuantity: 50,
     startTime: thirtyMinAgo,
-    notes: "Produção de cadernos em andamento."
+    notes: "Produção de cadernos em andamento.",
+    breaks: [],
   },
   {
     targetQuantity: 200,
-    notes: "Pedido urgente de canetas."
+    notes: "Pedido urgente de canetas.",
+    breaks: [],
   },
   {
     targetQuantity: 150,
+    breaks: [],
   },
   {
     targetQuantity: 75,
-    producedQuantity: 80, 
+    producedQuantity: 80,
     startTime: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
     endTime: new Date(now.getTime() - 3 * 30 * 60 * 1000).toISOString(),
     productionTime: 1800,
-    notes: "Lote de borrachas finalizado."
+    notes: "Lote de borrachas finalizado.",
+    breaks: [],
   }
 ];
 
@@ -70,4 +75,3 @@ export const DUMMY_DEMANDS_DATA: Omit<Demand, 'id' | 'createdAt' | 'skuId'>[] = 
 
 // Chaves para localStorage - Não são mais usadas para dados principais, mas podem ser úteis para configurações futuras
 export const LOCAL_STORAGE_SETTINGS_KEY = 'pcpTrackerSettings';
-

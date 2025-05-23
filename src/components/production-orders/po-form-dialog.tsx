@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,26 +24,33 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox"; // Importar Checkbox
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/app-context";
-import type { ProductionOrder, ProductionOrderStatus } from "@/types";
-import { PRODUCTION_ORDER_STATUSES } from "@/lib/constants";
+import type { ProductionOrder, ProductionOrderStatus, BreakEntry } from "@/types";
+// PRODUCTION_ORDER_STATUSES não é mais usado diretamente para popular o select de status
 import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react"; // Adicionado Trash2
 import { format, parseISO, isValid } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { v4 as uuidv4 } from 'uuid';
+import { Card } from "@/components/ui/card"; // Adicionado Card
+
+const breakEntrySchemaEdit = z.object({
+  id: z.string(), // ID é obrigatório ao editar pausas existentes
+  description: z.string().min(1, "Descrição da pausa é obrigatória."),
+  durationMinutes: z.coerce.number().min(1, "Duração deve ser pelo menos 1 minuto."),
+});
 
 const poFormSchema = z.object({
   skuId: z.string().min(1, "SKU é obrigatório."),
   targetQuantity: z.coerce.number().min(1, "Quantidade alvo deve ser pelo menos 1."),
   notes: z.string().optional(),
-  status: z.custom<ProductionOrderStatus>((val) => PRODUCTION_ORDER_STATUSES.includes(val as ProductionOrderStatus)).optional(),
+  status: z.custom<ProductionOrderStatus>((val) => ['Aberta', 'Em Progresso', 'Concluída', 'Cancelada'].includes(val as ProductionOrderStatus)).optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   producedQuantity: z.coerce.number().optional(),
-  deductLunchBreak: z.boolean().optional().default(false), // Novo campo
+  breaks: z.array(breakEntrySchemaEdit).optional().default([]),
 })
 .superRefine((data, ctx) => {
   const currentStatus = data.status;
@@ -106,7 +113,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
         status: productionOrder.status,
         startTime: formatIsoToDateTimeLocal(productionOrder.startTime),
         endTime: formatIsoToDateTimeLocal(productionOrder.endTime),
-        deductLunchBreak: false, // Inicializa como falso, usuário pode marcar se quiser recalcular
+        breaks: productionOrder.breaks?.map(b => ({...b})) || [],
       }
     : {
         skuId: "",
@@ -116,13 +123,18 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
         startTime: "",
         endTime: "",
         producedQuantity: undefined,
-        deductLunchBreak: false,
+        breaks: [],
       };
   }, [productionOrder]);
 
   const form = useForm<PoFormValues>({
     resolver: zodResolver(poFormSchema),
     defaultValues: getInitialValues(),
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "breaks",
   });
 
   useEffect(() => {
@@ -135,12 +147,18 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
   const onSubmit = (data: PoFormValues) => {
     try {
       const sku = findSkuById(data.skuId);
+      const breaksWithIds: BreakEntry[] = (data.breaks || []).map(b => ({
+        ...b,
+        id: b.id || uuidv4(),
+      }));
+
       if (productionOrder) {
         const updatePayload: Partial<Omit<ProductionOrder, 'id' | 'createdAt'>> = {
           skuId: data.skuId,
           targetQuantity: data.targetQuantity,
           notes: data.notes,
-          status: data.status, // Manter o status atual, a menos que seja explicitamente alterado
+          status: data.status,
+          breaks: breaksWithIds,
         };
 
         if (data.status === 'Em Progresso') {
@@ -158,24 +176,30 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             const endTimeMs = new Date(updatePayload.endTime).getTime();
             if (endTimeMs >= startTimeMs) {
               let calculatedProductionTime = Math.floor((endTimeMs - startTimeMs) / 1000);
-              if (data.deductLunchBreak) { // Aplica dedução se checkbox estiver marcado
-                calculatedProductionTime -= 3600;
-              }
+              const totalBreaksDurationSeconds = (breaksWithIds).reduce((acc, itemBreak) => acc + (itemBreak.durationMinutes * 60), 0);
+              calculatedProductionTime -= totalBreaksDurationSeconds;
               updatePayload.productionTime = calculatedProductionTime;
             } else {
-              updatePayload.productionTime = null; // Erro de data, tempo inválido
+              updatePayload.productionTime = null;
             }
           } else {
              updatePayload.productionTime = null;
           }
         }
 
-
         updateProductionOrder(productionOrder.id, updatePayload);
         toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) atualizada.` });
 
       } else {
-        addProductionOrder({ skuId: data.skuId, targetQuantity: data.targetQuantity, notes: data.notes });
+        // A lógica de adicionar breaks para novas OPs não está aqui,
+        // pois ao criar, ela começa como 'Aberta' sem pausas.
+        // Pausas são adicionadas ao finalizar ou editar.
+        addProductionOrder({ 
+            skuId: data.skuId, 
+            targetQuantity: data.targetQuantity, 
+            notes: data.notes,
+            // breaks: breaksWithIds // Novas OPs não têm pausas ao criar
+        });
         toast({ title: "Ordem de Produção Adicionada", description: `Nova OP para ${sku?.code || ''} adicionada.` });
       }
       setOpen(false);
@@ -185,7 +209,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     }
   };
 
-  const currentPoStatusForEdit = productionOrder?.status;
+  const currentPoStatusForEdit = form.watch("status"); // Usar form.watch para reatividade
 
   const sortedSkus = React.useMemo(() =>
     [...skus].sort((a, b) => a.code.localeCompare(b.code)),
@@ -201,14 +225,14 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{productionOrder ? "Editar Ordem de Produção" : "Criar Nova Ordem de Produção"}</DialogTitle>
           <DialogDescription>
             {productionOrder ? "Atualize os detalhes da OP." : "Preencha os detalhes para uma nova OP."}
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[65vh] pr-6">
+        <ScrollArea className="max-h-[70vh] pr-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
               <FormField
@@ -230,7 +254,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                       </FormControl>
                       <SelectContent>
                         {sortedSkus.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.code}</SelectItem>
+                          <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -265,7 +289,6 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                     <FormItem>
                       <FormLabel>Status</FormLabel>
                       <FormControl>
-                         {/* O status não é diretamente editável aqui; é alterado por ações específicas */}
                          <Input {...field} readOnly disabled className="bg-muted/50 cursor-not-allowed" />
                       </FormControl>
                       <FormMessage />
@@ -317,7 +340,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                             type="number"
                             placeholder="Ex: 95"
                             {...field}
-                            value={field.value ?? ''} // Garante que o valor seja sempre string ou number
+                            value={field.value ?? ''}
                             onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                           />
                         </FormControl>
@@ -325,27 +348,67 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="deductLunchBreak"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-card-foreground/5">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel className="cursor-pointer">
-                            Descontar pausa para almoço (60 min)?
-                          </FormLabel>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
                 </>
               )}
+
+              {/* Seção de Pausas para edição */}
+              {productionOrder && (currentPoStatusForEdit === 'Em Progresso' || currentPoStatusForEdit === 'Concluída') && (
+                <div className="space-y-3 pt-2">
+                  <FormLabel className="text-base font-medium">Gerenciar Pausas</FormLabel>
+                  {fields.map((field, index) => (
+                    <Card key={field.id} className="p-3 bg-card-foreground/5 border-border">
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
+                        <FormField
+                          control={form.control}
+                          name={`breaks.${index}.description`}
+                          render={({ field: breakField }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Descrição da Pausa</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ex: Almoço, Café" {...breakField} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`breaks.${index}.durationMinutes`}
+                          render={({ field: breakField }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Duração (min)</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="Ex: 60" {...breakField} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          className="md:self-end h-9 w-9"
+                          title="Remover Pausa"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ id: uuidv4(), description: "", durationMinutes: 0 })}
+                    className="mt-2"
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Pausa
+                  </Button>
+                </div>
+              )}
+
 
               <FormField
                 control={form.control}
@@ -354,7 +417,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                   <FormItem>
                     <FormLabel>Observações</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Observações adicionais (opcional)" {...field} />
+                      <Textarea placeholder="Observações adicionais (opcional)" {...field} value={field.value ?? ''}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -363,7 +426,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             </form>
           </Form>
         </ScrollArea>
-        <DialogFooter>
+        <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button
             type="button"
@@ -377,5 +440,3 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     </Dialog>
   );
 }
-
-    
