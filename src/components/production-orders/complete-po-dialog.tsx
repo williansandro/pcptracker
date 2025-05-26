@@ -30,6 +30,7 @@ import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, PlusCircle, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
 import { v4 as uuidv4 } from 'uuid';
 
 const breakEntrySchema = z.object({
@@ -60,7 +61,7 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
     resolver: zodResolver(completePoFormSchema),
     defaultValues: {
       producedQuantity: productionOrder.targetQuantity,
-      breaks: productionOrder.breaks?.map(b => ({...b})) || [], // Carrega pausas existentes
+      breaks: productionOrder.breaks?.map(b => ({...b, id: b.id || uuidv4()})) || [],
     },
   });
 
@@ -73,16 +74,16 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
     if (open) {
       form.reset({
         producedQuantity: productionOrder.targetQuantity,
-        breaks: productionOrder.breaks?.map(b => ({...b})) || [],
+        breaks: productionOrder.breaks?.map(b => ({...b, id: b.id || uuidv4()})) || [],
       });
     }
-  }, [open, form, productionOrder.targetQuantity, productionOrder.breaks]);
+  }, [open, form, productionOrder]);
 
   const onSubmit = (data: CompletePoFormValues) => {
     try {
       const breaksWithIds: BreakEntry[] = (data.breaks || []).map(b => ({
         ...b,
-        id: b.id || uuidv4(), // Garante que cada pausa tenha um ID
+        id: b.id || uuidv4(), 
       }));
 
       stopProductionOrderTimer(productionOrder.id, data.producedQuantity, breaksWithIds);
@@ -129,9 +130,12 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
               />
 
               <div className="space-y-3">
-                <FormLabel>Pausas Registradas</FormLabel>
-                {fields.map((field, index) => (
-                  <Card key={field.id} className="p-3 bg-card-foreground/5 border-border">
+                <FormLabel className="text-base font-medium">Pausas Registradas</FormLabel>
+                {fields.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">Nenhuma pausa registrada.</p>
+                )}
+                {fields.map((item, index) => (
+                  <Card key={item.id} className="p-3 bg-card-foreground/5 border-border">
                     <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
                       <FormField
                         control={form.control}
@@ -140,7 +144,7 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
                           <FormItem>
                             <FormLabel className="text-xs">Descrição da Pausa</FormLabel>
                             <FormControl>
-                              <Input placeholder="Ex: Almoço, Café, Manutenção" {...breakField} />
+                              <Input placeholder="Ex: Almoço, Manutenção" {...breakField} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -164,7 +168,7 @@ export function CompletePoDialog({ productionOrder, triggerButton }: CompletePoD
                         variant="destructive"
                         size="sm"
                         onClick={() => remove(index)}
-                        className="md:self-end"
+                        className="md:self-end h-9 w-9"
                         title="Remover Pausa"
                       >
                         <Trash2 className="h-4 w-4" />

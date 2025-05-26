@@ -27,17 +27,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/app-context";
 import type { ProductionOrder, ProductionOrderStatus, BreakEntry } from "@/types";
-// PRODUCTION_ORDER_STATUSES não é mais usado diretamente para popular o select de status
 import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Trash2 } from "lucide-react"; // Adicionado Trash2
+import { PlusCircle, Trash2 } from "lucide-react"; 
 import { format, parseISO, isValid } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { v4 as uuidv4 } from 'uuid';
-import { Card } from "@/components/ui/card"; // Adicionado Card
+import { Card } from "@/components/ui/card"; 
 
 const breakEntrySchemaEdit = z.object({
-  id: z.string(), // ID é obrigatório ao editar pausas existentes
+  id: z.string().optional(), // Opcional, pois pode ser uma nova pausa ou uma existente
   description: z.string().min(1, "Descrição da pausa é obrigatória."),
   durationMinutes: z.coerce.number().min(1, "Duração deve ser pelo menos 1 minuto."),
 });
@@ -113,7 +112,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
         status: productionOrder.status,
         startTime: formatIsoToDateTimeLocal(productionOrder.startTime),
         endTime: formatIsoToDateTimeLocal(productionOrder.endTime),
-        breaks: productionOrder.breaks?.map(b => ({...b})) || [],
+        breaks: productionOrder.breaks?.map(b => ({...b, id: b.id || uuidv4()})) || [],
       }
     : {
         skuId: "",
@@ -158,7 +157,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
           targetQuantity: data.targetQuantity,
           notes: data.notes,
           status: data.status,
-          breaks: breaksWithIds,
+          breaks: breaksWithIds, 
         };
 
         if (data.status === 'Em Progresso') {
@@ -191,14 +190,11 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
         toast({ title: "Ordem de Produção Atualizada", description: `OP ${productionOrder.id.substring(0,8)} (${sku?.code || ''}) atualizada.` });
 
       } else {
-        // A lógica de adicionar breaks para novas OPs não está aqui,
-        // pois ao criar, ela começa como 'Aberta' sem pausas.
-        // Pausas são adicionadas ao finalizar ou editar.
         addProductionOrder({ 
             skuId: data.skuId, 
             targetQuantity: data.targetQuantity, 
             notes: data.notes,
-            // breaks: breaksWithIds // Novas OPs não têm pausas ao criar
+            breaks: [] 
         });
         toast({ title: "Ordem de Produção Adicionada", description: `Nova OP para ${sku?.code || ''} adicionada.` });
       }
@@ -209,7 +205,7 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
     }
   };
 
-  const currentPoStatusForEdit = form.watch("status"); // Usar form.watch para reatividade
+  const currentPoStatusForEdit = form.watch("status"); 
 
   const sortedSkus = React.useMemo(() =>
     [...skus].sort((a, b) => a.code.localeCompare(b.code)),
@@ -232,9 +228,9 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
             {productionOrder ? "Atualize os detalhes da OP." : "Preencha os detalhes para uma nova OP."}
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[70vh] pr-6">
+        <ScrollArea className="max-h-[65vh] pr-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 pr-2">
               <FormField
                 control={form.control}
                 name="skuId"
@@ -351,12 +347,14 @@ export function PoFormDialog({ productionOrder, trigger }: PoFormDialogProps) {
                 </>
               )}
 
-              {/* Seção de Pausas para edição */}
               {productionOrder && (currentPoStatusForEdit === 'Em Progresso' || currentPoStatusForEdit === 'Concluída') && (
                 <div className="space-y-3 pt-2">
                   <FormLabel className="text-base font-medium">Gerenciar Pausas</FormLabel>
-                  {fields.map((field, index) => (
-                    <Card key={field.id} className="p-3 bg-card-foreground/5 border-border">
+                   {fields.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-2">Nenhuma pausa registrada.</p>
+                    )}
+                  {fields.map((item, index) => (
+                    <Card key={item.id} className="p-3 bg-card-foreground/5 border-border">
                       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
                         <FormField
                           control={form.control}
