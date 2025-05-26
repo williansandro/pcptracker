@@ -32,6 +32,9 @@ import { useToast } from "@/hooks/use-toast";
 const skuFormSchema = z.object({
   code: z.string().min(1, "Código é obrigatório").max(50, "Código não pode exceder 50 caracteres."),
   description: z.string().min(1, "Descrição é obrigatória.").max(255, "Descrição não pode exceder 255 caracteres."),
+  standardTimeSeconds: z.coerce.number().min(0, "Tempo padrão não pode ser negativo.").optional(),
+  assemblyTimeSeconds: z.coerce.number().min(0, "Tempo de montagem não pode ser negativo.").optional(),
+  // components: z.array(z.object(...)) // UI para BOM será adicionada depois
 });
 
 type SkuFormValues = z.infer<typeof skuFormSchema>;
@@ -50,6 +53,9 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
     return {
       code: sku?.code || "",
       description: sku?.description || "",
+      standardTimeSeconds: sku?.standardTimeSeconds || 0,
+      assemblyTimeSeconds: sku?.assemblyTimeSeconds || 0,
+      // components: sku?.components || [],
     };
   }, [sku]);
 
@@ -67,11 +73,13 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
   const onSubmit = (data: SkuFormValues) => {
     if (!sku) return;
     try {
-      // A verificação de duplicidade de código ao editar não é trivial
-      // se permitir a alteração do código. Por ora, mantemos o código não editável
-      // ou assumimos que a alteração de código não pode colidir com outros existentes.
-      // O AppContext não tem validação de duplicidade no updateSku atualmente.
-      updateSku(sku.id, data);
+      const updatePayload = {
+        ...data,
+        standardTimeSeconds: data.standardTimeSeconds || 0,
+        assemblyTimeSeconds: data.assemblyTimeSeconds || 0,
+        // components: data.components || [], // Manter componentes existentes
+      };
+      updateSku(sku.id, updatePayload);
       toast({ title: "SKU Atualizado", description: `SKU ${data.code} atualizado com sucesso.` });
       setOpen(false);
     } catch (error) {
@@ -85,11 +93,11 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
       <DialogTrigger asChild>
         {trigger}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Editar SKU</DialogTitle>
           <DialogDescription>
-            Atualize os detalhes do SKU. O código não pode ser alterado após a criação.
+            Atualize os detalhes do SKU. O código não pode ser alterado.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -104,9 +112,8 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                     <Input
                       placeholder="Ex: PROD001-AZ"
                       {...field}
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                       value={field.value ?? ''}
-                      readOnly // Código não é editável após a criação
+                      readOnly
                       className="bg-muted/50 cursor-not-allowed"
                     />
                   </FormControl>
@@ -127,6 +134,33 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="standardTimeSeconds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tempo Padrão (seg/unid)</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="Ex: 60" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || 0)} value={field.value ?? 0} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="assemblyTimeSeconds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tempo de Montagem (seg/unid)</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="Ex: 30" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || 0)} value={field.value ?? 0} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {/* Futuramente, aqui virá a UI para gerenciar os componentes da BOM */}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit">Salvar Alterações</Button>

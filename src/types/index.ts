@@ -3,7 +3,15 @@ export interface SKU {
   id: string;
   code: string;
   description: string;
+  standardTimeSeconds?: number; // Tempo padrão para produzir 1 unidade deste SKU
+  assemblyTimeSeconds?: number; // Tempo para montar/embalar este SKU, se composto
+  components?: BOMEntry[];      // Lista de componentes, se este SKU for montado
   createdAt: string; // ISO Date String
+}
+
+export interface BOMEntry {
+  componentSkuId: string; // ID do SKU componente
+  quantity: number;       // Quantidade deste componente necessária
 }
 
 export type ProductionOrderStatus = 'Aberta' | 'Em Progresso' | 'Concluída' | 'Cancelada';

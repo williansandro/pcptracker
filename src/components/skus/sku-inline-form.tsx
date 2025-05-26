@@ -22,6 +22,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const skuInlineFormSchema = z.object({
   code: z.string().min(1, "Código é obrigatório.").max(50, "Código não pode exceder 50 caracteres."),
   description: z.string().min(1, "Descrição é obrigatória.").max(255, "Descrição não pode exceder 255 caracteres."),
+  standardTimeSeconds: z.coerce.number().min(0, "Tempo padrão não pode ser negativo.").optional(),
+  assemblyTimeSeconds: z.coerce.number().min(0, "Tempo de montagem não pode ser negativo.").optional(),
 });
 
 type SkuInlineFormValues = z.infer<typeof skuInlineFormSchema>;
@@ -34,17 +36,23 @@ export function SkuInlineForm() {
     defaultValues: {
       code: "",
       description: "",
+      standardTimeSeconds: 0,
+      assemblyTimeSeconds: 0,
     },
   });
 
   const onSubmit = async (data: SkuInlineFormValues) => {
-    // AppContext.addSku agora retorna boolean e trata seus próprios toasts
-    const success = await addSku({ ...data, code: data.code.toUpperCase() });
+    const skuDataPayload = {
+      code: data.code.toUpperCase(),
+      description: data.description,
+      standardTimeSeconds: data.standardTimeSeconds || 0, // Salva 0 se undefined
+      assemblyTimeSeconds: data.assemblyTimeSeconds || 0, // Salva 0 se undefined
+      components: [], // Inicialmente sem componentes, gerenciado em outro lugar
+    };
+    const success = await addSku(skuDataPayload);
     if (success) {
-      form.reset(); // Limpar o formulário apenas em caso de sucesso
+      form.reset(); 
     }
-    // Nenhuma necessidade de try/catch aqui, pois addSku não lança mais erros por validações esperadas
-    // e trata seus próprios toasts de erro.
   };
 
   return (
@@ -54,7 +62,7 @@ export function SkuInlineForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-end">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 md:grid-cols-5 md:items-end">
             <FormField
               control={form.control}
               name="code"
@@ -86,7 +94,33 @@ export function SkuInlineForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="md:col-span-1 h-10 self-start md:self-end" disabled={form.formState.isSubmitting}>
+            <FormField
+              control={form.control}
+              name="standardTimeSeconds"
+              render={({ field }) => (
+                <FormItem className="md:col-span-1">
+                  <FormLabel>Tempo Padrão (seg)</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="Ex: 60" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || 0)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="assemblyTimeSeconds"
+              render={({ field }) => (
+                <FormItem className="md:col-span-1">
+                  <FormLabel>Tempo Montagem (seg)</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="Ex: 30" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || 0)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="md:col-span-1 h-10 self-start md:self-end mt-4 md:mt-0" disabled={form.formState.isSubmitting}>
               <PlusCircle className="mr-2 h-4 w-4" />
               {form.formState.isSubmitting ? "Adicionando..." : "Adicionar SKU"}
             </Button>

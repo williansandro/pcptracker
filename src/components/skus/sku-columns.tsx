@@ -54,6 +54,22 @@ export const skuColumns: ColumnDef<SKU>[] = [
     cell: ({ row }) => <div className="truncate max-w-xs">{row.getValue("description")}</div>,
   },
   {
+    accessorKey: "standardTimeSeconds",
+    header: "Tempo Padrão",
+    cell: ({ row }) => {
+      const seconds = row.getValue("standardTimeSeconds") as number | undefined;
+      return seconds !== undefined ? `${seconds} seg` : "-";
+    },
+  },
+  {
+    accessorKey: "assemblyTimeSeconds",
+    header: "Tempo Montagem",
+    cell: ({ row }) => {
+      const seconds = row.getValue("assemblyTimeSeconds") as number | undefined;
+      return seconds !== undefined ? `${seconds} seg` : "-";
+    },
+  },
+  {
     accessorKey: "createdAt",
     header: ({ column }) => {
       return (

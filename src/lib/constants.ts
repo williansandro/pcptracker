@@ -22,11 +22,24 @@ const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
 const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
 
 export const DUMMY_SKUS_DATA: Omit<SKU, 'id' | 'createdAt'>[] = [
-  { code: 'SKU-CANAZ-G', description: 'Caneta Azul Gel Ponta Grossa'},
-  { code: 'SKU-CADBR-P', description: 'Caderno Brochura Capa Dura Pequeno'},
-  { code: 'SKU-LAPHB-U', description: 'Lápis HB Preto Unitário'},
-  { code: 'SKU-BORBR-M', description: 'Borracha Branca Macia Média'},
-  { code: 'SKU-RGU30-T', description: 'Régua 30cm Transparente Acrílico'},
+  { code: 'SKU-CANAZ-G', description: 'Caneta Azul Gel Ponta Grossa', standardTimeSeconds: 30, assemblyTimeSeconds: 5 }, // Caneta precisa de montagem da carga + tampa
+  { code: 'SKU-CARGA-AZ', description: 'Carga Tinta Azul para Caneta', standardTimeSeconds: 15 }, // Componente
+  { code: 'SKU-CORPO-CAN', description: 'Corpo Plástico para Caneta', standardTimeSeconds: 10 }, // Componente
+  { code: 'SKU-TAMPA-CAN', description: 'Tampa Plástica para Caneta', standardTimeSeconds: 8 },   // Componente
+  { code: 'SKU-CADBR-P', description: 'Caderno Brochura Capa Dura Pequeno', standardTimeSeconds: 120, assemblyTimeSeconds: 60 },
+  { code: 'SKU-LAPHB-U', description: 'Lápis HB Preto Unitário', standardTimeSeconds: 20 },
+  { code: 'SKU-BORBR-M', description: 'Borracha Branca Macia Média', standardTimeSeconds: 10 },
+  { code: 'SKU-RGU30-T', description: 'Régua 30cm Transparente Acrílico', standardTimeSeconds: 25 },
+  { 
+    code: 'KIT-ESCOLAR-01', 
+    description: 'Kit Escolar Básico (Caneta, Lápis, Borracha)', 
+    assemblyTimeSeconds: 90, // Tempo para embalar o kit
+    components: [ // Será populado com IDs reais durante o seeding
+      { componentSkuId: 'ID_DA_CANETA_AZUL_GEL', quantity: 1 }, 
+      { componentSkuId: 'ID_DO_LAPIS_HB', quantity: 1 },
+      { componentSkuId: 'ID_DA_BORRACHA_BRANCA_M', quantity: 1 }
+    ]
+  },
 ];
 
 export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'createdAt' | 'status' | 'skuId'>[] = [
@@ -35,7 +48,7 @@ export const DUMMY_PRODUCTION_ORDERS_DATA: Omit<ProductionOrder, 'id' | 'created
     producedQuantity: 95,
     startTime: twoHoursAgo,
     endTime: oneHourAgo,
-    productionTime: 3540, // 3600 - 60 (pausa de 1 min para exemplo)
+    productionTime: 3540,
     notes: "Primeiro lote de canetas azuis.",
     breaks: [{ id: 'break1', description: "Pausa café", durationMinutes: 1 }]
   },
