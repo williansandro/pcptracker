@@ -1,7 +1,7 @@
 
 "use client";
 
-import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, ListTree } from "lucide-react"; // Adicionado ListTree
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import React from "react";
+import Link from "next/link";
 
 
 interface SkuActionsProps {
@@ -37,16 +38,13 @@ export function SkuActions({ sku }: SkuActionsProps) {
   const { deleteSku } = useAppContext();
   const { toast } = useToast();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     try {
-      deleteSku(sku.id); // Esta função agora lança um erro se houver dependências
-      toast({ title: "SKU Excluído", description: `SKU ${sku.code} excluído com sucesso.` });
+      await deleteSku(sku.id); 
+      // toast({ title: "SKU Excluído", description: `SKU ${sku.code} excluído com sucesso.` }); // Removido, pois deleteSku já mostra toast
     } catch (error: any) {
-      toast({ 
-        title: "Erro ao Excluir SKU", 
-        description: error.message || "Não foi possível excluir o SKU devido a dependências.", 
-        variant: "destructive" 
-      });
+      // toast já é exibido por deleteSku em caso de erro de dependência
+      console.error("Falha ao excluir SKU (pego em SkuActions):", error.message);
     }
   };
 
@@ -66,10 +64,16 @@ export function SkuActions({ sku }: SkuActionsProps) {
             sku={sku}
             trigger={
               <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                <Edit className="mr-2 h-4 w-4" /> Editar
+                <Edit className="mr-2 h-4 w-4" /> Editar Detalhes
               </DropdownMenuItem>
             }
           />
+          <DropdownMenuItem asChild>
+            <Link href={`/skus/${sku.id}/bom`} className="flex items-center w-full">
+              <ListTree className="mr-2 h-4 w-4" /> Gerenciar Componentes
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <AlertDialogTrigger asChild>
             <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
               <Trash2 className="mr-2 h-4 w-4" /> Excluir
@@ -95,4 +99,3 @@ export function SkuActions({ sku }: SkuActionsProps) {
     </AlertDialog>
   );
 }
-

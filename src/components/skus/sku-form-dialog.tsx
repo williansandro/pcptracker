@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,36 +25,30 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppContext } from "@/contexts/app-context";
-import type { SKU, BOMEntry } from "@/types";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import type { SKU } from "@/types"; // BOMEntry não é mais gerenciado aqui
+import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Trash2 } from "lucide-react";
+// PlusCircle, Trash2 não são mais usados aqui
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Card, Select, etc. relacionados a componentes não são mais usados aqui
 
-const bomEntrySchema = z.object({
-  componentSkuId: z.string().min(1, "SKU do componente é obrigatório."),
-  quantity: z.coerce.number().min(1, "Quantidade deve ser pelo menos 1."),
-});
-
+// Schema simplificado, sem 'components'
 const skuFormSchema = z.object({
   code: z.string().min(1, "Código é obrigatório.").max(50, "Código não pode exceder 50 caracteres."),
   description: z.string().min(1, "Descrição é obrigatória.").max(255, "Descrição não pode exceder 255 caracteres."),
   standardTimeSeconds: z.coerce.number().min(0, "Tempo padrão não pode ser negativo.").optional(),
   assemblyTimeSeconds: z.coerce.number().min(0, "Tempo de montagem não pode ser negativo.").optional(),
-  components: z.array(bomEntrySchema).optional().default([]),
 });
 
 type SkuFormValues = z.infer<typeof skuFormSchema>;
 
 interface SkuFormDialogProps {
-  sku: SKU; // Modal é apenas para edição, então SKU é obrigatório
+  sku: SKU; 
   trigger: React.ReactNode;
 }
 
 export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
-  const { skus: allSkus, updateSku } = useAppContext();
+  const { updateSku } = useAppContext(); // allSkus não é mais necessário aqui
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
@@ -64,7 +58,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
       description: sku?.description || "",
       standardTimeSeconds: sku?.standardTimeSeconds || 0,
       assemblyTimeSeconds: sku?.assemblyTimeSeconds || 0,
-      components: sku?.components?.map(c => ({ ...c })) || [],
+      // 'components' removido daqui
     };
   }, [sku]);
 
@@ -73,10 +67,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
     defaultValues: getInitialValues(),
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "components",
-  });
+  // useFieldArray para 'components' foi removido
 
   useEffect(() => {
     if (open && sku) {
@@ -84,27 +75,30 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
     }
   }, [sku, form, open, getInitialValues]);
 
-  const onSubmit = (data: SkuFormValues) => {
-    if (!sku) return; // Double check, though 'sku' prop is mandatory
+  const onSubmit = async (data: SkuFormValues) => {
+    if (!sku) return; 
     try {
-      const updatePayload: Partial<Omit<SKU, 'id' | 'createdAt'>> = {
-        ...data,
+      // Payload não inclui mais 'components' explicitamente aqui,
+      // a menos que updateSku espere. updateSku agora lida com atualizações parciais.
+      const updatePayload: Partial<Omit<SKU, 'id' | 'createdAt' | 'components'>> = {
+        code: data.code, // Código não é editável, mas está no formulário
+        description: data.description,
         standardTimeSeconds: data.standardTimeSeconds || 0,
         assemblyTimeSeconds: data.assemblyTimeSeconds || 0,
-        components: data.components || [],
       };
-      updateSku(sku.id, updatePayload);
-      toast({ title: "SKU Atualizado", description: `SKU ${data.code} atualizado com sucesso.` });
-      setOpen(false);
-    } catch (error) {
+      const success = await updateSku(sku.id, updatePayload);
+      if (success) {
+        toast({ title: "SKU Atualizado", description: `SKU ${data.code} atualizado com sucesso.` });
+        setOpen(false);
+      }
+      // Se updateSku retornar false, o toast de erro já é exibido pelo AppContext
+    } catch (error) { // Este catch é para erros inesperados não tratados por updateSku
       toast({ title: "Erro ao Atualizar", description: "Não foi possível salvar as alterações do SKU.", variant: "destructive" });
       console.error("Erro ao atualizar SKU:", error);
     }
   };
 
-  const availableSkusForComponents = useMemo(() => {
-    return allSkus.filter(s => s.id !== sku?.id).sort((a,b) => a.code.localeCompare(b.code));
-  }, [allSkus, sku]);
+  // availableSkusForComponents foi removido
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -115,12 +109,12 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
         <DialogHeader>
           <DialogTitle>Editar SKU</DialogTitle>
           <DialogDescription>
-            Atualize os detalhes do SKU. O código não pode ser alterado.
+            Atualize os detalhes do SKU. A Lista de Materiais é gerenciada em uma página dedicada.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[70vh] pr-4 -mr-4 pl-1"> {/* Ajuste de padding para ScrollArea */}
+        <ScrollArea className="max-h-[70vh] pr-4 -mr-4 pl-1"> 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4 pr-2"> {/* Adicionado pr-2 para não cortar o foco */}
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4 pr-2"> 
               <FormField
                 control={form.control}
                 name="code"
@@ -132,7 +126,7 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                         placeholder="Ex: PROD001-AZ"
                         {...field}
                         value={field.value ?? ''}
-                        readOnly
+                        readOnly // Código não é editável
                         className="bg-muted/50 cursor-not-allowed"
                         onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                       />
@@ -180,80 +174,13 @@ export function SkuFormDialog({ sku, trigger }: SkuFormDialogProps) {
                   </FormItem>
                 )}
               />
-
-              {/* Seção de Componentes (Lista de Materiais) */}
-              <div className="space-y-4 pt-4">
-                <FormLabel className="text-base font-medium text-foreground">Componentes (Lista de Materiais)</FormLabel>
-                {fields.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Nenhum componente adicionado.</p>
-                )}
-                {fields.map((item, index) => (
-                  <Card key={item.id} className="p-3 bg-card-foreground/5 border-border">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
-                      <FormField
-                        control={form.control}
-                        name={`components.${index}.componentSkuId`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs">Componente SKU</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione um componente" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {availableSkusForComponents.map(s => (
-                                  <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`components.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs">Quantidade</FormLabel>
-                            <FormControl>
-                              <Input type="number" placeholder="1" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || 1)} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        className="md:self-end h-9 w-9"
-                        title="Remover Componente"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append({ componentSkuId: "", quantity: 1 })}
-                  className="mt-2"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Componente
-                </Button>
-              </div>
+              {/* Seção de Componentes (Lista de Materiais) foi removida daqui */}
             </form>
           </Form>
         </ScrollArea>
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button type="submit" onClick={form.handleSubmit(onSubmit)}>Salvar Alterações</Button>
+          <Button type="button" onClick={form.handleSubmit(onSubmit)}>Salvar Alterações</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
