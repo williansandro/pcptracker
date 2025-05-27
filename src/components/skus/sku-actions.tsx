@@ -1,7 +1,7 @@
 
 "use client";
 
-import { MoreHorizontal, Edit, Trash2, ListTree } from "lucide-react"; // Adicionado ListTree
+import { MoreHorizontal, Edit, Trash2, ListTree, PackageSearch } from "lucide-react"; // Adicionado PackageSearch
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,8 +24,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog" // AlertDialogTrigger removido daqui pois é usado como child
 import React from "react";
 import Link from "next/link";
 
@@ -41,9 +40,7 @@ export function SkuActions({ sku }: SkuActionsProps) {
   const handleDelete = async () => {
     try {
       await deleteSku(sku.id); 
-      // toast({ title: "SKU Excluído", description: `SKU ${sku.code} excluído com sucesso.` }); // Removido, pois deleteSku já mostra toast
     } catch (error: any) {
-      // toast já é exibido por deleteSku em caso de erro de dependência
       console.error("Falha ao excluir SKU (pego em SkuActions):", error.message);
     }
   };
@@ -70,7 +67,12 @@ export function SkuActions({ sku }: SkuActionsProps) {
           />
           <DropdownMenuItem asChild>
             <Link href={`/skus/${sku.id}/bom`} className="flex items-center w-full">
-              <ListTree className="mr-2 h-4 w-4" /> Gerenciar Componentes
+              <ListTree className="mr-2 h-4 w-4" /> Gerenciar Componentes (BOM)
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={`/skus/${sku.id}/estrutura`} className="flex items-center w-full">
+              <PackageSearch className="mr-2 h-4 w-4" /> Ver Estrutura
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -91,7 +93,7 @@ export function SkuActions({ sku }: SkuActionsProps) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+          <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
             Excluir
           </AlertDialogAction>
         </AlertDialogFooter>
