@@ -325,7 +325,7 @@ export default function DashboardPage() {
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
                         return (percent * 100) > 5 ? (
-                          <text x={x} y={y} fill="hsl(var(--background))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontWeight="bold">
+                          <text x={x} y={y} fill="hsl(var(--primary-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontWeight="bold">
                             {`${(percent * 100).toFixed(0)}%`}
                           </text>
                         ) : null;
