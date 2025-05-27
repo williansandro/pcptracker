@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, PlusCircle, Save, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Save, Trash2, Loader2, PackageSearch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -37,7 +37,7 @@ export default function SkuBomPage() {
   const { skus: allSkus, findSkuById, updateSku, isDataReady } = useAppContext();
   const { toast } = useToast();
   
-  const [skuPai, setSkuPai] = useState<SKU | null | undefined>(undefined); // undefined for loading, null for not found
+  const [skuPai, setSkuPai] = useState<SKU | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -56,10 +56,17 @@ export default function SkuBomPage() {
   useEffect(() => {
     if (isDataReady && skuId) {
       const foundSku = findSkuById(skuId);
-      setSkuPai(foundSku);
+      setSkuPai(foundSku || null); // Define como null se não encontrado
       if (foundSku) {
-        form.reset({ components: foundSku.components?.map(c => ({...c})) || [] });
+        form.reset({ components: foundSku.components?.map(c => ({...c, quantity: Number(c.quantity) })) || [] });
       }
+      setIsLoading(false);
+    } else if (!isDataReady && skuId) {
+      // Se os dados não estão prontos mas temos skuId, continuamos carregando
+      setIsLoading(true);
+    } else if (!skuId) {
+      // Se não há skuId, definimos como não encontrado e paramos de carregar
+      setSkuPai(null);
       setIsLoading(false);
     }
   }, [skuId, isDataReady, findSkuById, form]);
@@ -70,28 +77,36 @@ export default function SkuBomPage() {
   }, [allSkus, skuPai]);
 
   const onSubmit = async (data: BomFormValues) => {
-    if (!skuPai) return;
+    if (!skuPai) {
+      toast({ title: "Erro", description: "SKU principal não encontrado.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
+
+    const processedComponents = data.components.map(c => ({
+      componentSkuId: c.componentSkuId,
+      quantity: Number(c.quantity) // Garantir que quantity seja um número
+    }));
+
+    const updatePayload = {
+      components: processedComponents
+    };
+    
+    console.log("[SkuBomPage] Attempting to save BOM. skuPai.id:", skuPai.id, "Payload:", JSON.stringify(updatePayload, null, 2));
+
     try {
-      const updatePayload: Partial<Omit<SKU, 'id' | 'createdAt'>> = {
-        components: data.components.map(c => ({
-            componentSkuId: c.componentSkuId,
-            quantity: c.quantity
-        })) // Mapear para garantir que não haja IDs extras de react-hook-form
-      };
-      const success = await updateSku(skuPai.id, updatePayload);
+      // Passando apenas o payload de componentes
+      const success = await updateSku(skuPai.id, updatePayload as Partial<Omit<SKU, 'id' | 'createdAt'>>);
       if (success) {
         toast({
           title: 'Lista de Materiais Atualizada',
           description: `Componentes do SKU ${skuPai.code} salvos com sucesso.`,
         });
-        // Opcional: forçar recarga dos dados ou confiar na atualização do estado do AppContext
-        // router.refresh(); // Pode ser necessário se o estado não atualizar visualmente
       } else {
         // O toast de erro já é exibido por updateSku
       }
     } catch (error) {
-      console.error('Erro ao salvar lista de materiais:', error);
+      console.error('Erro ao salvar lista de materiais na página BOM:', error);
       toast({
         title: 'Erro ao Salvar',
         description: 'Não foi possível salvar a lista de materiais.',
@@ -102,20 +117,21 @@ export default function SkuBomPage() {
     }
   };
 
-  if (isLoading || !isDataReady) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-3 text-lg">Carregando dados do SKU...</p>
+        <p className="ml-3 text-lg text-muted-foreground">Carregando dados do SKU...</p>
       </div>
     );
   }
 
-  if (skuPai === null) { // Explicitamente null após carregamento se não encontrado
+  if (!skuPai) { 
     return (
       <div className="container mx-auto py-10 text-center">
+        <PackageSearch className="mx-auto h-16 w-16 text-destructive mb-4" />
         <h1 className="text-2xl font-bold text-destructive mb-4">SKU Não Encontrado</h1>
-        <p className="mb-6">O SKU com o ID fornecido não foi encontrado.</p>
+        <p className="mb-6 text-muted-foreground">O SKU com o ID fornecido não foi encontrado.</p>
         <Button asChild variant="outline">
           <Link href="/skus">
             <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para SKUs
@@ -124,11 +140,6 @@ export default function SkuBomPage() {
       </div>
     );
   }
-  
-  if (!skuPai) { // Ainda carregando ou erro antes de definir como null
-      return <div className="flex items-center justify-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
-  }
-
 
   return (
     <div className="container mx-auto py-8">
@@ -234,7 +245,7 @@ export default function SkuBomPage() {
             <Button type="button" variant="outline" onClick={() => router.push('/skus')}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" disabled={isSaving || isLoading || !skuPai}>
               {isSaving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -248,3 +259,5 @@ export default function SkuBomPage() {
     </div>
   );
 }
+
+    

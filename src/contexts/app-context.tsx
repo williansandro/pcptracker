@@ -25,7 +25,7 @@ import {
   documentId,
   QuerySnapshot,
   DocumentData,
-  getDoc, // Import getDoc
+  getDoc,
   FirestoreError
 } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -41,10 +41,16 @@ interface DeleteSelectedSkusResult {
   notDeleted: { code: string; reason: string }[];
 }
 
+// Tipo específico para o payload de atualização de componentes
+type SkuComponentsUpdate = {
+  components: BOMEntry[];
+};
+
+
 interface AppContextType {
   skus: SKU[];
   addSku: (skuData: Omit<SKU, 'id' | 'createdAt' | 'components' | 'standardTimeSeconds' | 'assemblyTimeSeconds' > & { components?: Pick<BOMEntry, 'componentSkuId' | 'quantity'>[], standardTimeSeconds?: number, assemblyTimeSeconds?: number }) => Promise<boolean>;
-  updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>) => Promise<boolean>;
+  updateSku: (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>> | SkuComponentsUpdate) => Promise<boolean>;
   deleteSku: (skuId: string) => Promise<void>;
   deleteSelectedSkus: (skuIds: string[]) => Promise<DeleteSelectedSkusResult>;
   findSkuById: (skuId: string) => SKU | undefined;
@@ -78,26 +84,34 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
 
   const mapDocToSku = useCallback((docData: DocumentData): SKU => ({
     id: docData.id,
     code: docData.code,
     description: docData.description,
-    standardTimeSeconds: docData.standardTimeSeconds || 0,
-    assemblyTimeSeconds: docData.assemblyTimeSeconds || 0,
-    components: docData.components || [],
+    standardTimeSeconds: docData.standardTimeSeconds === undefined ? 0 : Number(docData.standardTimeSeconds),
+    assemblyTimeSeconds: docData.assemblyTimeSeconds === undefined ? 0 : Number(docData.assemblyTimeSeconds),
+    components: (docData.components || []).map((c: any) => ({ ...c, quantity: Number(c.quantity) })),
     createdAt: docData.createdAt,
   }), []);
 
   const mapDocToProductionOrder = useCallback((docData: DocumentData): ProductionOrder => ({
     ...docData,
     id: docData.id,
-    breaks: docData.breaks || [],
+    targetQuantity: Number(docData.targetQuantity),
+    producedQuantity: docData.producedQuantity === undefined ? undefined : Number(docData.producedQuantity),
+    productionTime: docData.productionTime === undefined || docData.productionTime === null ? null : Number(docData.productionTime),
+    breaks: (docData.breaks || []).map((b: any) => ({...b, durationMinutes: Number(b.durationMinutes), id: b.id || uuidv4()})),
   } as ProductionOrder), []);
 
   const mapDocToDemand = useCallback((docData: DocumentData): Demand => ({
     ...docData,
     id: docData.id,
+    targetQuantity: Number(docData.targetQuantity),
   } as Demand), []);
 
   const seedDatabase = useCallback(async () => {
@@ -119,25 +133,23 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           standardTimeSeconds: skuData.standardTimeSeconds || 0,
           assemblyTimeSeconds: skuData.assemblyTimeSeconds || 0,
           createdAt: new Date().toISOString(),
-          components: [], // Inicializa como array vazio
+          components: [],
         };
         
         skuCodeToIdMap[skuData.code] = newSkuId;
         const skuRef = doc(db, SKUS_COLLECTION, newSkuId);
         batchSkus.set(skuRef, newSkuDoc);
         
-        // Armazena para processamento posterior da BOM
         skusParaProcessarBOM.push({
           ...newSkuDoc,
           id: newSkuId,
-          // @ts-ignore Se skuData.components existir, armazena temporariamente
+          // @ts-ignore
           tempComponents: skuData.components ? skuData.components.map(c => ({ componentSkuCode: c.componentSkuId, quantity: c.quantity })) : undefined,
         });
       }
       await batchSkus.commit();
       console.log("SKUs populados (fase 1):", skusParaProcessarBOM.length);
   
-      // Fase 2: Processar BOMs
       const batchBOM = writeBatch(db);
       let bomUpdatesMade = false;
       const finalSeededSkus: SKU[] = [];
@@ -158,7 +170,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             .map(comp => {
               const componentId = skuCodeToIdMap[comp.componentSkuCode];
               if (componentId) {
-                return { componentSkuId: componentId, quantity: comp.quantity };
+                return { componentSkuId: componentId, quantity: Number(comp.quantity) };
               }
               console.warn(`[Seed] Componente SKU (código) ${comp.componentSkuCode} não encontrado para BOM do SKU ${tempSku.code}`);
               return null;
@@ -184,7 +196,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const batchPOs = writeBatch(db);
       const seededPOs: ProductionOrder[] = [];
       DUMMY_PRODUCTION_ORDERS_DATA.forEach((poData, index) => {
-        const skuForPoData = DUMMY_SKUS_DATA[index % DUMMY_SKUS_DATA.length];
+        const skuForPoData = DUMMY_SKUS_DATA[index % DUMMY_SKUS_DATA.length]; // Cicla pelos SKUs
         const skuIdForPo = skuCodeToIdMap[skuForPoData.code];
 
         if (!skuIdForPo) {
@@ -203,12 +215,12 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           id: newPoId,
           skuId: skuIdForPo,
           status,
-          targetQuantity: poData.targetQuantity,
-          producedQuantity: status === 'Concluída' ? poData.producedQuantity : undefined,
+          targetQuantity: Number(poData.targetQuantity),
+          producedQuantity: status === 'Concluída' ? Number(poData.producedQuantity) : undefined,
           startTime: status === 'Em Progresso' || status === 'Concluída' ? poData.startTime : null,
           endTime: status === 'Concluída' ? poData.endTime : null,
           productionTime: status === 'Concluída' ? poData.productionTime : null,
-          breaks: (poData.breaks || []).map(b => ({...b, id: b.id || uuidv4()})),
+          breaks: (poData.breaks || []).map(b => ({...b, id: b.id || uuidv4(), durationMinutes: Number(b.durationMinutes)})),
           createdAt: new Date(Date.now() - (DUMMY_PRODUCTION_ORDERS_DATA.length - index) * 10 * 60 * 1000).toISOString(),
         };
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, newPo.id);
@@ -234,6 +246,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ...demandData,
           id: newDemandId,
           skuId: skuIdForDemand,
+          targetQuantity: Number(demandData.targetQuantity),
           createdAt: new Date().toISOString(),
         };
         const demandRef = doc(db, DEMANDS_COLLECTION, newDemand.id);
@@ -300,10 +313,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (isMounted && !authLoading) {
       if (currentUser) {
         console.log("Usuário autenticado, buscando dados...");
@@ -338,7 +347,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ...skuData, 
         standardTimeSeconds: skuData.standardTimeSeconds || 0,
         assemblyTimeSeconds: skuData.assemblyTimeSeconds || 0,
-        components: skuData.components || [], 
+        components: (skuData.components || []).map(c => ({ ...c, quantity: Number(c.quantity) })), 
         id: newSkuId,
         createdAt: new Date().toISOString()
       };
@@ -348,36 +357,41 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       toast({ title: "SKU Adicionado", description: `SKU ${newSku.code} adicionado com sucesso.` });
       return true;
     } catch (error: any) {
-      console.error("Erro na operação Firestore ao adicionar SKU:", error);
+      console.error("[AppContext] Erro em addSku:", error);
       toast({
         title: "Erro ao Adicionar SKU",
-        description: (error as Error).message || "Não foi possível adicionar o SKU ao banco de dados.",
+        description: (error as Error).message || "Não foi possível adicionar o SKU.",
         variant: "destructive",
       });
       return false;
     }
   }, [toast]);
 
-  const updateSku = useCallback(async (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>>): Promise<boolean> => {
+  const updateSku = useCallback(async (skuId: string, skuData: Partial<Omit<SKU, 'id' | 'createdAt'>> | SkuComponentsUpdate): Promise<boolean> => {
     console.log("[AppContext] updateSku - Received skuId:", skuId);
     console.log("[AppContext] updateSku - Received skuData:", JSON.stringify(skuData, null, 2));
     
     const skuRef = doc(db, SKUS_COLLECTION, skuId);
-    
-    // Construir o payload de atualização apenas com os campos fornecidos em skuData
     const updatePayload: Partial<SKU> = {};
-    if (skuData.code !== undefined) updatePayload.code = skuData.code;
-    if (skuData.description !== undefined) updatePayload.description = skuData.description;
-    if (skuData.standardTimeSeconds !== undefined) updatePayload.standardTimeSeconds = skuData.standardTimeSeconds;
-    if (skuData.assemblyTimeSeconds !== undefined) updatePayload.assemblyTimeSeconds = skuData.assemblyTimeSeconds;
-    if (skuData.components !== undefined) updatePayload.components = skuData.components; // Pode ser um array vazio para limpar
 
+    if ('code' in skuData && skuData.code !== undefined) updatePayload.code = skuData.code;
+    if ('description' in skuData && skuData.description !== undefined) updatePayload.description = skuData.description;
+    if ('standardTimeSeconds' in skuData && skuData.standardTimeSeconds !== undefined) updatePayload.standardTimeSeconds = Number(skuData.standardTimeSeconds);
+    if ('assemblyTimeSeconds' in skuData && skuData.assemblyTimeSeconds !== undefined) updatePayload.assemblyTimeSeconds = Number(skuData.assemblyTimeSeconds);
+    
+    // Tratar o caso específico de SkuComponentsUpdate
+    if ('components' in skuData && skuData.components !== undefined) {
+      updatePayload.components = skuData.components.map(c => ({
+        componentSkuId: c.componentSkuId,
+        quantity: Number(c.quantity) // Garantir que quantity seja número
+      }));
+    }
+    
     console.log("[AppContext] updateSku - Sending updatePayload:", JSON.stringify(updatePayload, null, 2));
 
     if (Object.keys(updatePayload).length === 0) {
-      console.log("[AppContext] updateSku - No fields to update for SKU:", skuId);
       toast({ title: "Nenhuma Alteração", description: "Nenhuma alteração foi detectada para o SKU." });
-      return true; // Nenhuma alteração, mas não é um erro
+      return true;
     }
     
     try {
@@ -385,14 +399,15 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   
       setSkus(prevSkus =>
         prevSkus.map(s =>
-          s.id === skuId ? { ...s, ...updatePayload } as SKU : s
+          s.id === skuId ? mapDocToSku({ ...s, ...updatePayload }) : s // Usar mapDocToSku para consistência
         ).sort((a, b) => a.code.localeCompare(b.code))
       );
   
-      const currentSku = skus.find(s => s.id === skuId); // Pode pegar o estado antes da atualização para o nome no toast
-      toast({ title: "SKU Atualizado", description: `SKU ${updatePayload.code || currentSku?.code} atualizado.`});
+      const updatedSku = skus.find(s => s.id === skuId);
+      toast({ title: "SKU Atualizado", description: `SKU ${updatePayload.code || updatedSku?.code} atualizado.`});
       return true;
     } catch (error: any) {
+      console.error("[AppContext] Erro em updateSku:", error);
       const firestoreError = error as FirestoreError;
       if (firestoreError.code === 'not-found') {
         toast({
@@ -401,7 +416,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           variant: "destructive",
         });
       } else {
-        console.error("Erro ao atualizar SKU:", skuId, error);
         toast({
           title: "Erro ao Atualizar SKU",
           description: (error as Error).message || "Não foi possível atualizar o SKU.",
@@ -410,7 +424,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       return false;
     }
-  }, [toast, skus]);
+  }, [toast, skus, mapDocToSku]);
   
   const deleteSku = useCallback(async (skuId: string) => {
     const skuToDelete = skus.find(s => s.id === skuId);
@@ -521,7 +535,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ...poData,
       id: newPoId,
       status: 'Aberta',
-      breaks: (poData.breaks || []).map(b => ({...b, id: b.id || uuidv4()})),
+      breaks: (poData.breaks || []).map(b => ({...b, id: b.id || uuidv4(), durationMinutes: Number(b.durationMinutes)})),
       createdAt: new Date().toISOString()
     };
     try {
@@ -543,9 +557,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
       let updateData: Partial<ProductionOrder> = { ...poData };
   
-      // Assegurar que breaks seja um array com IDs
       if (updateData.breaks) {
-        updateData.breaks = updateData.breaks.map(b => ({...b, id: b.id || uuidv4()}));
+        updateData.breaks = updateData.breaks.map(b => ({...b, id: b.id || uuidv4(), durationMinutes: Number(b.durationMinutes)}));
       }
   
       if (poData.status === 'Concluída' && poData.startTime && poData.endTime) {
@@ -576,7 +589,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
   
       setProductionOrders(prev =>
-        prev.map(po => po.id === poId ? { ...po, ...finalUpdateData } as ProductionOrder : po)
+        prev.map(po => po.id === poId ? mapDocToProductionOrder({ ...po, ...finalUpdateData }) : po)
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       );
        toast({ title: "Ordem de Produção Atualizada", description: `OP ${poId.substring(0,8)} atualizada.`});
@@ -588,7 +601,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, mapDocToProductionOrder]);
   
   const deleteProductionOrder = useCallback(async (poId: string) => {
     try {
@@ -637,13 +650,13 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       startTime: new Date().toISOString(),
       endTime: null, 
       productionTime: null, 
-      breaks: (poToUpdate.breaks || []).map(b => ({...b, id: b.id || uuidv4()})),
+      breaks: (poToUpdate.breaks || []).map(b => ({...b, id: b.id || uuidv4(), durationMinutes: Number(b.durationMinutes)})),
     };
     try {
       const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
       await updateDoc(poRef, updateData);
       setProductionOrders(prev => prev.map(po =>
-        po.id === poId ? { ...po, ...updateData } as ProductionOrder : po
+        po.id === poId ? mapDocToProductionOrder({ ...po, ...updateData }) : po
       ).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error: any) {
       console.error("Erro ao iniciar timer da OP:", poId, error);
@@ -654,7 +667,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
        throw error; 
     }
-  }, [productionOrders, toast]);
+  }, [productionOrders, toast, mapDocToProductionOrder]);
 
   const stopProductionOrderTimer = useCallback(async (poId: string, producedQuantity: number, breaks?: BreakEntry[]) => {
     const poToUpdate = productionOrders.find(po => po.id === poId);
@@ -662,22 +675,21 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const endTime = new Date();
       let productionTimeSeconds = Math.floor((endTime.getTime() - new Date(poToUpdate.startTime).getTime()) / 1000);
       
-      const finalBreaks = (breaks || []).map(b => ({...b, id: b.id || uuidv4()}));
+      const finalBreaks = (breaks || []).map(b => ({...b, id: b.id || uuidv4(), durationMinutes: Number(b.durationMinutes)}));
       const totalBreaksDurationSeconds = finalBreaks.reduce((acc, itemBreak) => acc + (itemBreak.durationMinutes * 60), 0);
       productionTimeSeconds -= totalBreaksDurationSeconds;
-      // Não impedir que productionTimeSeconds seja negativo
       
       const updateData = {
         status: 'Concluída' as ProductionOrderStatus,
         endTime: endTime.toISOString(),
         productionTime: productionTimeSeconds,
-        producedQuantity,
+        producedQuantity: Number(producedQuantity),
         breaks: finalBreaks,
       };
       try {
         const poRef = doc(db, PRODUCTION_ORDERS_COLLECTION, poId);
         await updateDoc(poRef, updateData);
-        setProductionOrders(prev => prev.map(po => po.id === poId ? { ...po, ...updateData } as ProductionOrder : po)
+        setProductionOrders(prev => prev.map(po => po.id === poId ? mapDocToProductionOrder({ ...po, ...updateData }) : po)
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       } catch (error: any) {
         console.error("Erro ao parar timer da OP:", poId, error);
@@ -693,7 +705,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         toast({ title: "Ação Inválida", description: "Não foi possível finalizar esta OP. Verifique seu status.", variant: "default"});
         throw new Error("Ação Inválida: Não foi possível finalizar esta OP.");
     }
-  }, [productionOrders, toast]);
+  }, [productionOrders, toast, mapDocToProductionOrder]);
 
   const findProductionOrderById = useCallback((poId: string) => productionOrders.find(po => po.id === poId), [productionOrders]);
   const getProductionOrdersBySku = useCallback((skuId: string) => productionOrders.filter(po => po.skuId === skuId), [productionOrders]);
@@ -710,7 +722,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     const newDemandId = uuidv4();
-    const newDemand: Demand = { ...demandData, id: newDemandId, createdAt: new Date().toISOString() };
+    const newDemand: Demand = { ...demandData, id: newDemandId, createdAt: new Date().toISOString(), targetQuantity: Number(demandData.targetQuantity) };
     try {
       await setDoc(doc(db, DEMANDS_COLLECTION, newDemand.id), newDemand);
       setDemands(prev => [...prev, newDemand].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
@@ -753,8 +765,12 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const demandRef = doc(db, DEMANDS_COLLECTION, demandId);
       const updatePayload = Object.entries(demandData).reduce((acc, [key, value]) => {
-        if (value !== undefined) { 
-          (acc as any)[key as keyof typeof demandData] = value;
+        if (value !== undefined) {
+          if (key === 'targetQuantity') {
+            (acc as any)[key] = Number(value);
+          } else {
+            (acc as any)[key as keyof typeof demandData] = value;
+          }
         }
         return acc;
       }, {} as Partial<Demand>);
@@ -762,7 +778,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (Object.keys(updatePayload).length > 0) {
         await updateDoc(demandRef, updatePayload);
       }
-      setDemands(prev => prev.map(d => d.id === demandId ? { ...d, ...updatePayload } as Demand : d)
+      setDemands(prev => prev.map(d => d.id === demandId ? mapDocToDemand({ ...d, ...updatePayload }) : d)
       .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       toast({ title: "Demanda Atualizada", description: `Demanda atualizada.`});
     } catch (error: any) {
@@ -773,7 +789,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         variant: "destructive",
       });
     }
-  }, [demands, skus, toast]);
+  }, [demands, skus, toast, mapDocToDemand]);
 
   const deleteDemand = useCallback(async (demandId: string) => {
     try {
@@ -853,3 +869,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
