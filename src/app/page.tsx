@@ -5,7 +5,7 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ProductionChart } from '@/components/dashboard/production-chart';
 import { DemandFulfillmentCard } from '@/components/dashboard/demand-fulfillment-card';
 import { useAppContext } from '@/contexts/app-context';
-import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp, FilterX, LayersIcon, Filter } from 'lucide-react';
+import { Package, Factory, CheckCircle2, Clock3, PieChartIcon, BarChartIcon, ListChecks, TimerIcon, TrendingUp, FilterX, LayersIcon, Filter, AlertTriangle, TrendingDown, TrendingUpIcon } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,10 +23,10 @@ import type { ProductionOrderStatus, ProductionOrder, SKU } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUS_COLORS: Record<ProductionOrderStatus, string> = {
-  Aberta: "hsl(var(--chart-3))", // Laranja
-  "Em Progresso": "hsl(var(--chart-4))", // Verde
-  Concluída: "hsl(var(--chart-2))", // Roxo
-  Cancelada: "hsl(var(--chart-5))", // Rosa/Magenta
+  Aberta: "hsl(var(--chart-3))",
+  "Em Progresso": "hsl(var(--chart-4))",
+  Concluída: "hsl(var(--chart-2))",
+  Cancelada: "hsl(var(--chart-5))",
 };
 
 const CHART_COLORS = [
@@ -41,6 +41,7 @@ interface CompletedPoDetails extends ProductionOrder {
   skuCode: string;
   skuDescription: string;
   secondsPerUnit: string | number;
+  totalStandardTimeForSku: number; // Novo campo
 }
 
 export default function DashboardPage() {
@@ -54,7 +55,7 @@ export default function DashboardPage() {
     return allProductionOrders.filter(po => po.skuId === selectedSkuFilter.id);
   }, [allProductionOrders, selectedSkuFilter]);
 
-  const filteredDemands = useMemo(() => {
+  const filteredDemands = useMemo(() => { // Não usado diretamente nos cálculos atuais, mas bom ter
     if (!selectedSkuFilter) return allDemands;
     return allDemands.filter(d => d.skuId === selectedSkuFilter.id);
   }, [allDemands, selectedSkuFilter]);
@@ -90,6 +91,7 @@ export default function DashboardPage() {
 
   const topSkusByProducedQuantityData = useMemo(() => {
     const skuProduction: Record<string, { totalProduced: number; skuObject: SKU }> = {};
+    // Usar allProductionOrders para este gráfico, para ter visão geral, mesmo com filtro ativo
     allProductionOrders.forEach(po => {
       if (po.status === 'Concluída' && po.producedQuantity && po.producedQuantity > 0) {
         const sku = findSkuById(po.skuId);
@@ -115,23 +117,40 @@ export default function DashboardPage() {
   }, [allProductionOrders, findSkuById]);
 
 
-  const completedPoDetails = useMemo(() => {
+  const completedPoDetails = useMemo((): CompletedPoDetails[] => {
     return filteredProductionOrders
       .filter(po => po.status === 'Concluída')
       .map(po => {
         const sku = findSkuById(po.skuId);
         const secondsPerUnit = (po.productionTime && po.producedQuantity && po.producedQuantity > 0)
-          ? (po.productionTime / po.producedQuantity).toFixed(2)
+          ? (po.productionTime / po.producedQuantity) // Manter numérico para comparação
           : 'N/D';
+
+        // Calcular tempo padrão total do SKU
+        let totalStandardTimeForSku = 0;
+        if (sku) {
+          let componentsTime = 0;
+          if (sku.components && sku.components.length > 0) {
+            sku.components.forEach(compEntry => {
+              const componentSku = findSkuById(compEntry.componentSkuId);
+              if (componentSku) {
+                componentsTime += (componentSku.standardTimeSeconds || 0) * compEntry.quantity;
+              }
+            });
+          }
+          totalStandardTimeForSku = componentsTime + (sku.assemblyTimeSeconds || 0);
+        }
+
         return {
           ...po,
           skuCode: sku?.code || 'N/D',
           skuDescription: sku?.description || 'SKU não encontrado',
           secondsPerUnit,
+          totalStandardTimeForSku,
         };
       })
       .sort((a, b) => (b.endTime && a.endTime) ? new Date(b.endTime).getTime() - new Date(a.endTime).getTime() : 0);
-  }, [filteredProductionOrders, findSkuById]);
+  }, [filteredProductionOrders, findSkuById, skus]); // Adicionado skus aqui
 
   const avgProductionTimePerSkuData = useMemo(() => {
     const sourcePOs = selectedSkuFilter
@@ -163,8 +182,8 @@ export default function DashboardPage() {
         };
       })
       .filter(item => item.avgTimeSeconds > 0)
-      .sort((a, b) => b.poCount - a.poCount)
-      .slice(0, selectedSkuFilter ? 1 : 5);
+      .sort((a, b) => b.poCount - a.poCount) // Ordena por número de OPs para mostrar os mais frequentes
+      .slice(0, selectedSkuFilter ? 1 : 5); // Mostra top 5 ou apenas o selecionado
 
     return skusWithAvgTime.map((item, index) => ({
       skuCode: item.skuCode,
@@ -219,7 +238,7 @@ export default function DashboardPage() {
         <MetricCard title="Total de SKUs" value={<span className="text-primary">{totalSKUs}</span>} icon={Package} description="Número de SKUs cadastrados" />
         <MetricCard title="Ordens Abertas/Em Progresso" value={<span className="text-primary">{totalOpenOrInProgressPOs}</span>} icon={Factory} description={`Ordens pendentes ou em execução ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
         <MetricCard title="Ordens Concluídas" value={<span className="text-primary">{completedPOsCount}</span>} icon={CheckCircle2} description={`Ordens de produção finalizadas ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
-        <MetricCard title="Tempo Médio de Produção (Geral)" value={<span className="text-primary">{avgProductionTimeOverall}</span>} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: '(Geral)'}`} />
+        <MetricCard title="Tempo Médio de Produção (Geral)" value={<span className="text-primary">{avgProductionTimeOverall}</span>} icon={Clock3} description={`Tempo médio por ordem concluída ${selectedSkuFilter ? `para ${selectedSkuFilter.code}`: ''}`} />
       </div>
 
       <div className="flex items-center justify-start gap-4 mb-0 -mt-2">
@@ -251,9 +270,9 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <DemandFulfillmentCard
-          demands={allDemands}
-          productionOrders={allProductionOrders}
-          selectedSku={selectedSkuFilter}
+          demands={allDemands} // Passando todas as demandas
+          productionOrders={allProductionOrders} // Passando todas as OPs
+          selectedSku={selectedSkuFilter} // Passando o SKU selecionado
         />
         <Card>
           <CardHeader>
@@ -456,36 +475,51 @@ export default function DashboardPage() {
                     <TableHead>SKU</TableHead>
                     <TableHead className="text-center">Meta</TableHead>
                     <TableHead className="text-center">Qtd. Prod.</TableHead>
-                    <TableHead className="text-center">Início</TableHead>
-                    <TableHead className="text-center">Fim</TableHead>
                     <TableHead className="text-center">Tempo Líquido</TableHead>
-                    <TableHead className="text-right">Seg/Unid.</TableHead>
+                    <TableHead className="text-center">Tempo Padrão (SKU)</TableHead>
+                    <TableHead className="text-right">Seg/Unid. (Real)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {completedPoDetails.map((po) => (
-                    <TableRow
-                      key={po.id}
-                      className="border-b-border hover:bg-muted/30"
-                    >
-                      <TableCell>
-                        <div className="font-medium text-primary">{po.skuCode}</div>
-                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">{po.skuDescription}</div>
-                      </TableCell>
-                      <TableCell className="text-center">{po.targetQuantity.toLocaleString('pt-BR')} Un</TableCell>
-                      <TableCell className="text-center">{po.producedQuantity?.toLocaleString('pt-BR') || '-'} Un</TableCell>
-                      <TableCell className="text-center">
-                        <ClientSideDateTime dateString={po.startTime} outputFormat="dd/MM/yyyy, HH:mm:ss" locale={ptBR} placeholder="-" />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <ClientSideDateTime dateString={po.endTime} outputFormat="dd/MM/yyyy, HH:mm:ss" locale={ptBR} placeholder="-" />
-                      </TableCell>
-                      <TableCell className="text-center">{formatDuration(po.productionTime)}</TableCell>
-                      <TableCell className={cn("text-right font-semibold", po.secondsPerUnit !== 'N/D' ? 'text-accent' : 'text-muted-foreground')}>
-                        {po.secondsPerUnit}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {completedPoDetails.map((po) => {
+                    const secondsPerUnitReal = typeof po.secondsPerUnit === 'number' ? po.secondsPerUnit : NaN;
+                    let comparisonIcon = null;
+                    let textColor = "text-foreground/70"; // Default text color
+
+                    if (!isNaN(secondsPerUnitReal) && po.totalStandardTimeForSku > 0) {
+                      if (secondsPerUnitReal < po.totalStandardTimeForSku) {
+                        textColor = "text-green-500"; // Mais rápido que o padrão
+                        comparisonIcon = <TrendingUpIcon className="inline h-4 w-4 ml-1" />;
+                      } else if (secondsPerUnitReal > po.totalStandardTimeForSku) {
+                        textColor = "text-red-500"; // Mais lento que o padrão
+                        comparisonIcon = <TrendingDown className="inline h-4 w-4 ml-1" />;
+                      } else {
+                        textColor = "text-blue-500"; // Igual ao padrão
+                      }
+                    } else if (po.secondsPerUnit === 'N/D') {
+                        textColor = "text-muted-foreground";
+                    }
+
+                    return (
+                      <TableRow
+                        key={po.id}
+                        className="border-b-border hover:bg-muted/30"
+                      >
+                        <TableCell>
+                          <div className="font-medium text-primary">{po.skuCode}</div>
+                          <div className="text-xs text-muted-foreground truncate max-w-[200px]">{po.skuDescription}</div>
+                        </TableCell>
+                        <TableCell className="text-center">{po.targetQuantity.toLocaleString('pt-BR')} Un</TableCell>
+                        <TableCell className="text-center">{po.producedQuantity?.toLocaleString('pt-BR') || '-'} Un</TableCell>
+                        <TableCell className="text-center">{formatDuration(po.productionTime)}</TableCell>
+                        <TableCell className="text-center">{po.totalStandardTimeForSku > 0 ? `${po.totalStandardTimeForSku.toFixed(0)} seg` : 'N/D'}</TableCell>
+                        <TableCell className={cn("text-right font-semibold", textColor)}>
+                           {typeof po.secondsPerUnit === 'number' ? `${po.secondsPerUnit.toFixed(2)}` : po.secondsPerUnit}
+                           {comparisonIcon}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -497,3 +531,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
