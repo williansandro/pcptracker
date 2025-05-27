@@ -24,7 +24,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog" // AlertDialogTrigger removido daqui pois é usado como child
+  AlertDialogTrigger, // Adicionada a importação aqui
+} from "@/components/ui/alert-dialog";
 import React from "react";
 import Link from "next/link";
 
@@ -41,7 +42,8 @@ export function SkuActions({ sku }: SkuActionsProps) {
     try {
       await deleteSku(sku.id); 
     } catch (error: any) {
-      console.error("Falha ao excluir SKU (pego em SkuActions):", error.message);
+      // O toast de erro já é exibido por deleteSku no AppContext
+      // console.error("Falha ao excluir SKU (pego em SkuActions):", error.message);
     }
   };
 
