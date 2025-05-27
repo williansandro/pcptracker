@@ -1,19 +1,23 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppContext } from '@/contexts/app-context';
 import type { SKU, BOMEntry } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Loader2, PackageSearch, Settings2 } from 'lucide-react'; // Ícone Settings2 para BOM
+import { ArrowLeft, Loader2, PackageSearch, Settings2, WatchIcon } from 'lucide-react';
 import Link from 'next/link';
+import { formatDuration } from '@/lib/utils';
 
 interface EnrichedBOMEntry extends BOMEntry {
   componentCode?: string;
   componentDescription?: string;
+  componentStandardTimeSeconds?: number;
+  componentAssemblyTimeSeconds?: number; // Embora não usado diretamente no cálculo total aqui, é bom ter
+  calculatedComponentTotalTime?: number;
 }
 
 export default function SkuStructurePage() {
@@ -30,14 +34,18 @@ export default function SkuStructurePage() {
     if (isDataReady) {
       if (skuId) {
         const foundSku = findSkuById(skuId);
-        setSkuPai(foundSku); // Define como null se não encontrado, ou o SKU se encontrado
+        setSkuPai(foundSku); 
         if (foundSku && foundSku.components) {
           const enriched = foundSku.components.map(comp => {
             const componentSku = findSkuById(comp.componentSkuId);
+            const componentStandardTime = componentSku?.standardTimeSeconds || 0;
             return {
               ...comp,
               componentCode: componentSku?.code || 'N/D',
               componentDescription: componentSku?.description || 'Componente não encontrado',
+              componentStandardTimeSeconds: componentStandardTime,
+              componentAssemblyTimeSeconds: componentSku?.assemblyTimeSeconds || 0,
+              calculatedComponentTotalTime: comp.quantity * componentStandardTime,
             };
           });
           setEnrichedComponents(enriched);
@@ -45,12 +53,24 @@ export default function SkuStructurePage() {
           setEnrichedComponents([]);
         }
       } else {
-        // Se não há skuId nos params, mas os dados estão prontos, significa SKU não encontrado
         setSkuPai(null);
       }
       setIsLoading(false);
     }
   }, [skuId, isDataReady, findSkuById]);
+
+  const totalComponentTimeSeconds = useMemo(() => {
+    return enrichedComponents.reduce((sum, comp) => sum + (comp.calculatedComponentTotalTime || 0), 0);
+  }, [enrichedComponents]);
+
+  const parentAssemblyTimeSeconds = useMemo(() => {
+    return skuPai?.assemblyTimeSeconds || 0;
+  }, [skuPai]);
+
+  const totalEstimatedProductionTimeSeconds = useMemo(() => {
+    return totalComponentTimeSeconds + parentAssemblyTimeSeconds;
+  }, [totalComponentTimeSeconds, parentAssemblyTimeSeconds]);
+
 
   if (isLoading || !isDataReady) {
     return (
@@ -101,7 +121,7 @@ export default function SkuStructurePage() {
         </div>
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="shadow-lg mb-6">
         <CardHeader>
           <CardTitle className="text-xl">Componentes Diretos</CardTitle>
           <CardDescription>
@@ -114,9 +134,11 @@ export default function SkuStructurePage() {
                 <Table>
                 <TableHeader>
                     <TableRow>
-                    <TableHead className="w-[200px]">Código do Componente</TableHead>
-                    <TableHead>Descrição do Componente</TableHead>
-                    <TableHead className="text-right w-[180px]">Quantidade Necessária</TableHead>
+                    <TableHead className="min-w-[150px]">Código Componente</TableHead>
+                    <TableHead>Descrição Componente</TableHead>
+                    <TableHead className="text-center">Qtd. Necessária</TableHead>
+                    <TableHead className="text-center">Tempo Padrão (Comp.)</TableHead>
+                    <TableHead className="text-right">Tempo Total (Comp.)</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -124,7 +146,9 @@ export default function SkuStructurePage() {
                     <TableRow key={index} className="hover:bg-muted/30">
                         <TableCell className="font-medium text-accent">{comp.componentCode}</TableCell>
                         <TableCell>{comp.componentDescription}</TableCell>
-                        <TableCell className="text-right">{comp.quantity.toLocaleString('pt-BR')}</TableCell>
+                        <TableCell className="text-center">{comp.quantity.toLocaleString('pt-BR')}</TableCell>
+                        <TableCell className="text-center">{comp.componentStandardTimeSeconds || 0} seg</TableCell>
+                        <TableCell className="text-right font-semibold">{comp.calculatedComponentTotalTime || 0} seg</TableCell>
                     </TableRow>
                     ))}
                 </TableBody>
@@ -146,12 +170,33 @@ export default function SkuStructurePage() {
         </CardContent>
       </Card>
 
-      {/* 
-        Futuramente, poderíamos adicionar aqui:
-        - Visualização hierárquica/em árvore para componentes de múltiplos níveis.
-        - Cálculo de custo total baseado nos componentes.
-        - Verificação de disponibilidade de componentes.
-      */}
+      <Card className="shadow-lg">
+        <CardHeader>
+            <CardTitle className="text-xl flex items-center">
+                <WatchIcon className="mr-2 h-5 w-5 text-primary" />
+                Resumo de Tempos de Produção
+            </CardTitle>
+            <CardDescription>
+                Estimativa de tempo para produzir uma unidade do SKU <span className="font-semibold text-primary">{skuPai.code}</span>.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
+                <span className="text-muted-foreground">Soma dos Tempos Padrão dos Componentes:</span>
+                <span className="font-semibold">{totalComponentTimeSeconds} seg ({formatDuration(totalComponentTimeSeconds)})</span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
+                <span className="text-muted-foreground">Tempo de Montagem/Embalagem do Produto Principal:</span>
+                <span className="font-semibold">{parentAssemblyTimeSeconds} seg ({formatDuration(parentAssemblyTimeSeconds)})</span>
+            </div>
+            <div className="flex justify-between items-center p-4 bg-primary/10 rounded-md border border-primary/30">
+                <span className="font-bold text-base text-primary">Tempo Total Estimado para Produzir 1 Unidade:</span>
+                <span className="font-bold text-lg text-primary">{totalEstimatedProductionTimeSeconds} seg ({formatDuration(totalEstimatedProductionTimeSeconds)})</span>
+            </div>
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
+
