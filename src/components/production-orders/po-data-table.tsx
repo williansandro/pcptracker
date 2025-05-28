@@ -12,6 +12,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
+import { format, parseISO } from 'date-fns';
 
 import {
   Table,
@@ -36,11 +37,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Adicionada a importação aqui
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Filter } from "lucide-react";
+import { Trash2, Filter, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface PoDataTableProps<TData extends ProductionOrder, TValue> {
   data: TData[];
@@ -58,6 +61,7 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
   const [rowSelection, setRowSelection] = React.useState({});
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
   const [skuFilter, setSkuFilter] = React.useState<string>("all");
+  const [monthYearFilter, setMonthYearFilter] = React.useState<string>("");
 
   const { deleteSelectedProductionOrders } = useAppContext();
   const { toast } = useToast();
@@ -72,11 +76,26 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
   [skus]);
 
   const filteredData = React.useMemo(() => {
-    if (skuFilter === "all") {
-      return data;
+    let MêsAno = data;
+
+    if (skuFilter !== "all") {
+      MêsAno = MêsAno.filter(po => po.skuId === skuFilter);
     }
-    return data.filter(po => po.skuId === skuFilter);
-  }, [data, skuFilter]);
+
+    if (monthYearFilter) {
+      MêsAno = MêsAno.filter(po => {
+        if (!po.createdAt) return false;
+        try {
+          const poMonthYear = format(parseISO(po.createdAt), "yyyy-MM");
+          return poMonthYear === monthYearFilter;
+        } catch (error) {
+          console.error("Erro ao formatar data para filtro:", po.createdAt, error);
+          return false;
+        }
+      });
+    }
+    return MêsAno;
+  }, [data, skuFilter, monthYearFilter]);
 
   const table = useReactTable({
     data: filteredData,
@@ -116,24 +135,50 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
     setIsConfirmOpen(false);
   };
 
+  const clearMonthYearFilter = () => {
+    setMonthYearFilter("");
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <Select onValueChange={setSkuFilter} value={skuFilter}>
-          <SelectTrigger className="w-full md:w-[280px] h-10">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:gap-2">
+          <div className="grid w-full md:w-[280px] items-center gap-1.5">
+            <Label htmlFor="sku-filter-po" className="text-xs text-muted-foreground">Filtrar por SKU</Label>
+            <Select onValueChange={setSkuFilter} value={skuFilter} >
+              <SelectTrigger className="h-10" id="sku-filter-po">
+                <div className="flex items-center">
+                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Filtrar por SKU..." />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os SKUs</SelectItem>
+                {sortedSkus.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid w-full md:w-[200px] items-center gap-1.5">
+             <Label htmlFor="month-year-filter-po" className="text-xs text-muted-foreground">Filtrar por Mês/Ano (Criação)</Label>
             <div className="flex items-center">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Filtrar por SKU..." />
+              <Input
+                type="month"
+                id="month-year-filter-po"
+                value={monthYearFilter}
+                onChange={(e) => setMonthYearFilter(e.target.value)}
+                className="h-10"
+              />
+              {monthYearFilter && (
+                <Button onClick={clearMonthYearFilter} variant="ghost" size="icon" className="ml-1 h-9 w-9">
+                  <XCircle className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              )}
             </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os SKUs</SelectItem>
-            {sortedSkus.map(s => (
-              <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex items-center space-x-2 self-end md:self-center">
+          </div>
+        </div>
+        <div className="flex items-center space-x-2 self-end md:self-end">
           {selectedRows.length > 0 && (
             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
               <AlertDialogTrigger asChild>
@@ -169,7 +214,7 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="border-b-border">
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id} className="py-3">
@@ -209,7 +254,7 @@ export function PoDataTable<TData extends ProductionOrder, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Nenhuma Ordem de Produção encontrada {skuFilter !== "all" ? `para o SKU selecionado` : ''}.
+                  Nenhuma Ordem de Produção encontrada {skuFilter !== "all" || monthYearFilter ? `para os filtros aplicados` : ''}.
                 </TableCell>
               </TableRow>
             )}

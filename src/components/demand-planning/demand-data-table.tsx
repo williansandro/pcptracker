@@ -38,10 +38,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Filter } from "lucide-react";
+import { Trash2, Filter, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SkuProductionDetailsModal } from "./sku-production-details-modal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface DemandDataTableProps<TData extends Demand, TValue> {
   data: TData[];
@@ -63,6 +65,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
   const [rowSelection, setRowSelection] = React.useState({});
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
   const [skuFilter, setSkuFilter] = React.useState<string>("all");
+  const [monthYearFilter, setMonthYearFilter] = React.useState<string>("");
 
   const [isSkuDetailsModalOpen, setIsSkuDetailsModalOpen] = React.useState(false);
   const [selectedSkuDataForModal, setSelectedSkuDataForModal] = React.useState<{sku: SKU, productionOrders: ProductionOrder[]} | null>(null);
@@ -70,25 +73,10 @@ export function DemandDataTable<TData extends Demand, TValue>({
   const { deleteSelectedDemands } = useAppContext();
   const { toast } = useToast();
 
-  // Garante que localProductionOrders seja sempre um array
   const localProductionOrders = propProductionOrders || [];
 
   const handleSkuClick = React.useCallback((sku: SKU) => {
-    console.log("[DemandDataTable] handleSkuClick for SKU ID:", sku.id, "SKU Code:", sku.code);
-    // const specificPoIdToCheck = "ad479d66-a681-4d33-a2f2-2d2e861f9525";
-    // const opFromImageInLocalList = localProductionOrders.find(po => po.id === specificPoIdToCheck);
-
-    // if (opFromImageInLocalList) {
-    //   console.log(`[DemandDataTable] OP from image (${specificPoIdToCheck}) FOUND in localProductionOrders. Its skuId:`, opFromImageInLocalList.skuId);
-    //   console.log(`[DemandDataTable] Comparing OP's skuId ('${opFromImageInLocalList.skuId}') with clicked SKU's id ('${sku.id}'). Match: ${opFromImageInLocalList.skuId === sku.id}`);
-    // } else {
-    //   console.log(`[DemandDataTable] OP from image (${specificPoIdToCheck}) NOT FOUND in localProductionOrders.`);
-    // }
-
     const ordersForSku = localProductionOrders.filter(po => po.skuId === sku.id);
-    console.log("[DemandDataTable] Filtered ordersForSku (length):", ordersForSku.length, ordersForSku.map(o => o.id));
-
-
     setSelectedSkuDataForModal({ sku, productionOrders: ordersForSku });
     setIsSkuDetailsModalOpen(true);
   }, [localProductionOrders]);
@@ -103,11 +91,17 @@ export function DemandDataTable<TData extends Demand, TValue>({
   [skus]);
 
   const filteredData = React.useMemo(() => {
-    if (skuFilter === "all") {
-      return data;
+    let MêsAno = data;
+
+    if (skuFilter !== "all") {
+      MêsAno = MêsAno.filter(demand => demand.skuId === skuFilter);
     }
-    return data.filter(demand => demand.skuId === skuFilter);
-  }, [data, skuFilter]);
+
+    if (monthYearFilter) {
+      MêsAno = MêsAno.filter(demand => demand.monthYear === monthYearFilter);
+    }
+    return MêsAno;
+  }, [data, skuFilter, monthYearFilter]);
 
   const table = useReactTable({
     data: filteredData,
@@ -147,24 +141,50 @@ export function DemandDataTable<TData extends Demand, TValue>({
     setIsConfirmOpen(false);
   };
 
+  const clearMonthYearFilter = () => {
+    setMonthYearFilter("");
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <Select onValueChange={setSkuFilter} value={skuFilter}>
-          <SelectTrigger className="w-full md:w-[280px] h-10">
-             <div className="flex items-center">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Filtrar por SKU..." />
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:gap-2">
+          <div className="grid w-full md:w-[280px] items-center gap-1.5">
+             <Label htmlFor="sku-filter-demand" className="text-xs text-muted-foreground">Filtrar por SKU</Label>
+            <Select onValueChange={setSkuFilter} value={skuFilter}>
+              <SelectTrigger className="h-10" id="sku-filter-demand">
+                 <div className="flex items-center">
+                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Filtrar por SKU..." />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os SKUs</SelectItem>
+                {sortedSkus.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid w-full md:w-[200px] items-center gap-1.5">
+            <Label htmlFor="month-year-filter-demand" className="text-xs text-muted-foreground">Filtrar por Mês/Ano</Label>
+            <div className="flex items-center">
+              <Input
+                type="month"
+                id="month-year-filter-demand"
+                value={monthYearFilter}
+                onChange={(e) => setMonthYearFilter(e.target.value)}
+                className="h-10"
+              />
+              {monthYearFilter && (
+                <Button onClick={clearMonthYearFilter} variant="ghost" size="icon" className="ml-1 h-9 w-9">
+                  <XCircle className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              )}
             </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os SKUs</SelectItem>
-            {sortedSkus.map(s => (
-              <SelectItem key={s.id} value={s.id}>{s.code} - {s.description}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex items-center space-x-2 self-end md:self-center">
+          </div>
+        </div>
+        <div className="flex items-center space-x-2 self-end md:self-end">
           {selectedRows.length > 0 && (
             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
               <AlertDialogTrigger asChild>
@@ -240,7 +260,7 @@ export function DemandDataTable<TData extends Demand, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Nenhuma demanda encontrada {skuFilter !== "all" ? `para o SKU selecionado` : ''}.
+                  Nenhuma demanda encontrada {skuFilter !== "all" || monthYearFilter ? `para os filtros aplicados` : ''}.
                 </TableCell>
               </TableRow>
             )}
